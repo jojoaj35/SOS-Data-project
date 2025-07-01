@@ -158,6 +158,11 @@ yes_no_cols = ['Learn Participation 2022',
                'Trip Eligible (Yes/No)',
                'Scholarship Badge (Yes/No)']
 
+schools_with_clubs = ['Brackenridge High School','Whittier Middle School', 'Driscoll Middle school', 'Advanced Learning Academy', 
+                      "Young Women's Leadership Academy", 'CAST Med High School', 'International School of the Americas', 'South San High School', 
+                      'Churchill High School', 'Johnson High School', 'CAST Tech High School' , 'IDEA Converse', 'RISE Inspire Academy', 
+                      'Nimitz Middle School', 'Thomas Jefferson High School', "Young Men's Leadership Academy", 'Southside High School']
+
 #Convert Yes/No columns to 1/0
 clients[yes_no_cols] = clients[yes_no_cols].replace({'Yes': 1, 'No': 0}) 
 
@@ -185,6 +190,19 @@ clients['Service Range'] = clients['Latest Service'] - clients['Earliest Service
 
 #Create a 'Follow Through' Column to show if client actualy volunteered after signing up
 clients['Follow Through'] = np.where(clients['Hours']>0, 1, 0).astype(int) 
+
+#Create 'Club' column to show if a club exists at a clients school
+clients['Club'] = np.where(clients['School'].isin(schools_with_clubs),1,0).astype(int)
+
+hours['qtr-year'] = (
+    hours['Event Date'].dt.year.astype(str) +
+    '-Q' + hours['Event Date'].dt.quarter.astype(str)
+)
+
+qtr_vol_counts = month_vol_counts = pd.DataFrame(
+    list(hours.groupby('qtr-year')['Galaxy ID'].nunique().to_dict().items()), columns=['QTR', 'Active Volunteers']
+)
+
 
 #Match zip codes to counties
 def county_assign(zip):            
@@ -352,14 +370,14 @@ app.layout= dbc.Container(
                     dbc.Card(
                         dbc.CardBody([
                             dcc.Markdown('Active Volunteer by Month and Year'),
-                            dcc.Graph(id='vol_line_graph', figure={}),
-                            dcc.Dropdown(id='month-select',
-                                         options=[{'label': str(mon), 'value': mon} for mon in range(1, 13)],
-                                         value=curr_month),
-                            dcc.Dropdown(id='year-select',
-                                         options=[{'label': str(yr), 'value': yr} for yr in range(2020, curr_year + 1)],
-                                         value=curr_year),
-                            dbc.Button('Generate Graph', id='line_graph_button', n_clicks=0, color='primary', className='mb-2')
+                            dcc.Graph(figure=px.line(qtr_vol_counts, x='QTR', y='Active Volunteers')),
+                            #dcc.Dropdown(id='month-select',
+                                         #options=[{'label': str(mon), 'value': mon} for mon in range(1, 13)],
+                                         #value=curr_month),
+                            #dcc.Dropdown(id='year-select',
+                                         #options=[{'label': str(yr), 'value': yr} for yr in range(2020, curr_year + 1)],
+                                         #value=curr_year),
+                            #dbc.Button('Generate Graph', id='line_graph_button', n_clicks=0, color='primary', className='mb-2')
                         ]),
                         className='my-1',
                         style={'height': '600px'}
@@ -382,6 +400,7 @@ def pie_chart(age):
     pie = px.pie(age_df, names='District')
     return pie
 
+"""
 @callback(
     Output('vol_line_graph','figure'), [
     Input('line_graph_button', 'n_clicks'),
@@ -399,7 +418,13 @@ def generate_vol_counts_line_chart(n_clicks, month_select, year_select):
         return px.line(vol_counts_store, x='Month',y='Active Volunteers')
     elif n_clicks > 1:
         return px.line(vol_counts_store[vol_counts_store['Month']<dt.date(year_select, month_select + 1,1)], x='Month', y='Active Volunteers')
-
+"""
+"""
+@callback(
+    Output('Vol_line_graph','figure'),
+    Input('qtr-select','value')
+)
+"""
 if __name__ == '__main__':
     Timer(1, lambda: webbrowser.open("http://localhost:8000")).start()
     app.run(debug=False, host= 'localhost', port=8000)
