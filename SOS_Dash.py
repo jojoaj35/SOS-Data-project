@@ -335,6 +335,19 @@ app.layout= dbc.Container(
                     width=4,
                     style={'display': 'flex', 'flexDirection': 'column'}
                 ),
+                dbc.Col([
+                    dbc.Card(
+                        dbc.CardBody([
+                            dcc.Markdown('Club vs no club Comparison')
+                        ]),
+                        className='my-1',
+                        style={'height': '300px'}),
+                    dbc.Card(
+                        dbc.CardBody([
+                            dcc.Markdown('This is where the map goes')
+                        ])
+                    )
+                ]),
                 dbc.Col(
                     dbc.Card(
                         dbc.CardBody([
@@ -352,7 +365,7 @@ app.layout= dbc.Container(
                         style={'height': '600px'}
                     ),
                     width=6
-                )
+                ),
             ],
             style={'height':'100vh'}
         )
