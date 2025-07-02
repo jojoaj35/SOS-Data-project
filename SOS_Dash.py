@@ -9,7 +9,8 @@ from dash import Dash, dcc, callback, Output, Input, html
 import webbrowser
 from threading import Timer
 import datetime as dt
-from scipy import stats as scipystats
+from scipy import stats as scipystat
+import math
 
 
 #Load dataset
@@ -245,34 +246,6 @@ clients['Income Range (Thousands)'] = clients['Median Family Income'].apply(inco
 curr_year=max(clients['Latest Service']).year
 curr_month=max(clients['Latest Service']).month
 
-#count number of active volunteers in each month from january 1, 2020 until now.
-def active_volunteers_by_month():
-    month_vol_counts_dict = {}
-
-    for year in range(2020, curr_year+1):
-        if year < curr_year:
-            for month in range(1,13):
-                active_sum = 0
-                for index in list(clients[clients['Follow Through']==1].index):
-                    if clients.loc[index]['Earliest Service'].date() <= dt.date(year,month,1) <= clients.loc[index]['Latest Service'].date():
-                        active_sum += 1
-                    if active_sum != 0:
-                        month_vol_counts_dict[dt.date(year,month,1)] = active_sum
-        if year == curr_year:
-            for month in range(1,curr_month+1):
-                active_sum = 0
-                for index in list(clients[clients['Follow Through']==1].index):
-                    if clients.loc[index]['Earliest Service'].date() <= dt.date(year,month,1) <= clients.loc[index]['Latest Service'].date():
-                        active_sum += 1
-                    if active_sum != 0:
-                        month_vol_counts_dict[dt.date(year,month,1)] = active_sum
-
-    month_vol_counts = pd.DataFrame(
-        list(month_vol_counts_dict.items()), columns=['Month', 'Active Volunteers']
-    )
-
-    return month_vol_counts
-
 def population_stat(df, col):
     """
     This function will create two dataframes based around the specific column provided.
@@ -320,6 +293,39 @@ def population_stat(df, col):
 def get_hours_value():
     return '{:,.2f}'.format(clients['Hours'].sum()*31)
 
+#Create dataframe with school based volunteer hours means depending on whether they have a club or not.
+schoolclub_hours = clients.groupby(by='School').agg({'Hours':'sum'}).reset_index()
+schoolclub_hours['Club'] = np.where(schoolclub_hours['School'].isin(schools_with_clubs),1,0).astype(str)
+
+#returns the lower and upper margin of error limits for schools with clubs vs schools without clubs
+def get_club_ci():
+    alpha=0.05
+    club_mu = schoolclub_hours[schoolclub_hours['Club']=='1']['Hours'].mean()
+    club_sigma = stat.stdev(schoolclub_hours[schoolclub_hours['Club']=='1']['Hours'])
+    club_n = len(schoolclub_hours[schoolclub_hours['Club']=='1'])
+    club_conf_t = abs(round(scipystat.t.ppf(alpha/2, club_n-1),2))
+    noclub_mu = schoolclub_hours[schoolclub_hours['Club']=='0']['Hours'].mean()
+    noclub_sigma = stat.stdev(schoolclub_hours[schoolclub_hours['Club']=='0']['Hours'])
+    noclub_n = len(schoolclub_hours[schoolclub_hours['Club']=='0'])
+    noclub_conf_t = abs(round(scipystat.t.ppf(alpha/2, noclub_n-1),2))
+
+    club_lower = round(club_mu - club_conf_t*(club_sigma/math.sqrt(club_n)),2)
+    club_upper = round(club_mu + club_conf_t*(club_sigma/math.sqrt(club_n)),2)
+
+    noclub_lower = round(noclub_mu - noclub_conf_t*(noclub_sigma/math.sqrt(noclub_n)),2)
+    noclub_upper = round(noclub_mu + noclub_conf_t*(noclub_sigma/math.sqrt(noclub_n)),2)
+
+    return club_lower, club_upper, noclub_lower, noclub_upper
+
+club_low, club_high, noclub_low, noclub_high = get_club_ci()
+
+#Create schools with club volunteer hours comparison bar chart
+def club_hours_comparison_bar():
+    clubhours_filter = schoolclub_hours.copy()
+    clubhours_filter['Club'] = clubhours_filter['Club'].replace({'0':'No Club', '1':'Club'})
+    chart = px.bar(clubhours_filter.groupby(by='Club')['Hours'].mean().reset_index(), x='Club', y='Hours')
+    return chart
+
 #holds values for line graph
 vol_counts_store = {}
 
@@ -356,7 +362,9 @@ app.layout= dbc.Container(
                 dbc.Col([
                     dbc.Card(
                         dbc.CardBody([
-                            dcc.Markdown('Club vs no club Comparison')
+                            dcc.Markdown('Club vs no club Comparison'),
+                            dcc.Graph(figure=club_hours_comparison_bar()),
+                            dcc.Markdown(f'Club C.I.: {club_low} - {club_high}\nNo Club C.I.: {noclub_low} - {noclub_high}')
                         ]),
                         className='my-1',
                         style={'height': '300px'}),
@@ -371,13 +379,6 @@ app.layout= dbc.Container(
                         dbc.CardBody([
                             dcc.Markdown('Active Volunteer by Month and Year'),
                             dcc.Graph(figure=px.line(qtr_vol_counts, x='QTR', y='Active Volunteers')),
-                            #dcc.Dropdown(id='month-select',
-                                         #options=[{'label': str(mon), 'value': mon} for mon in range(1, 13)],
-                                         #value=curr_month),
-                            #dcc.Dropdown(id='year-select',
-                                         #options=[{'label': str(yr), 'value': yr} for yr in range(2020, curr_year + 1)],
-                                         #value=curr_year),
-                            #dbc.Button('Generate Graph', id='line_graph_button', n_clicks=0, color='primary', className='mb-2')
                         ]),
                         className='my-1',
                         style={'height': '600px'}
@@ -400,31 +401,6 @@ def pie_chart(age):
     pie = px.pie(age_df, names='District')
     return pie
 
-"""
-@callback(
-    Output('vol_line_graph','figure'), [
-    Input('line_graph_button', 'n_clicks'),
-    Input('month-select','value'),
-    Input('year-select','value')]
-)
-def generate_vol_counts_line_chart(n_clicks, month_select, year_select):
-    global vol_counts_store
-
-    if n_clicks is None or n_clicks == 0:
-        return {}
-    elif n_clicks == 1:
-        vol_counts = active_volunteers_by_month()
-        vol_counts_store = vol_counts
-        return px.line(vol_counts_store, x='Month',y='Active Volunteers')
-    elif n_clicks > 1:
-        return px.line(vol_counts_store[vol_counts_store['Month']<dt.date(year_select, month_select + 1,1)], x='Month', y='Active Volunteers')
-"""
-"""
-@callback(
-    Output('Vol_line_graph','figure'),
-    Input('qtr-select','value')
-)
-"""
 if __name__ == '__main__':
     Timer(1, lambda: webbrowser.open("http://localhost:8000")).start()
     app.run(debug=False, host= 'localhost', port=8000)
