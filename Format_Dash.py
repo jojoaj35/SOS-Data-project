@@ -299,16 +299,22 @@ schoolclub_hours['Club'] = np.where(schoolclub_hours['School'].isin(schools_with
 
 #returns the lower and upper margin of error limits for schools with clubs vs schools without clubs
 def get_club_ci():
+    #confidence for the confidence interval
     alpha=0.05
+
+    #Get interval bounds for clubs by getting mu, sigma, and n. Then gets the inverse t for that sample
     club_mu = schoolclub_hours[schoolclub_hours['Club']=='1']['Hours'].mean()
     club_sigma = stat.stdev(schoolclub_hours[schoolclub_hours['Club']=='1']['Hours'])
     club_n = len(schoolclub_hours[schoolclub_hours['Club']=='1'])
     club_conf_t = abs(round(scipystat.t.ppf(alpha/2, club_n-1),2))
+
+    #Same calculation but for the no club sample
     noclub_mu = schoolclub_hours[schoolclub_hours['Club']=='0']['Hours'].mean()
     noclub_sigma = stat.stdev(schoolclub_hours[schoolclub_hours['Club']=='0']['Hours'])
     noclub_n = len(schoolclub_hours[schoolclub_hours['Club']=='0'])
     noclub_conf_t = abs(round(scipystat.t.ppf(alpha/2, noclub_n-1),2))
 
+    #Calculate club and no club confidence interval bounds
     club_lower = round(club_mu - club_conf_t*(club_sigma/math.sqrt(club_n)),2)
     club_upper = round(club_mu + club_conf_t*(club_sigma/math.sqrt(club_n)),2)
 
@@ -319,12 +325,34 @@ def get_club_ci():
 
 club_low, club_high, noclub_low, noclub_high = get_club_ci()
 
+ci_line_graph_df = pd.DataFrame([
+    {'x':noclub_low, 'Category':0},
+    {'x':noclub_high, 'Category':0},
+    {'x':club_low, 'Category':1},
+    {'x':club_high, 'Category':1}
+])
+
+def ci_line_chart():
+    stacked_line = px.line(ci_line_graph_df, x='x', y='Category', color='Category', 
+              markers=True, line_shape='linear')
+
+    stacked_line.update_layout(
+        title="Number Lines as Stacked Line Graph",
+        xaxis_title="Value",
+        yaxis_title="Category",
+        yaxis=dict(tickmode='array', tickvals=[0, 1], ticktext=['No Club', 'Club'])
+    )
+
+    return stacked_line
+
+""""
 #Create schools with club volunteer hours comparison bar chart
 def club_hours_comparison_bar():
     clubhours_filter = schoolclub_hours.copy()
     clubhours_filter['Club'] = clubhours_filter['Club'].replace({'0':'No Club', '1':'Club'})
     chart = px.bar(clubhours_filter.groupby(by='Club')['Hours'].mean().reset_index(), x='Club', y='Hours')
     return chart
+"""
 
 #holds values for line graph
 vol_counts_store = {}
@@ -389,17 +417,34 @@ dashboard_layout = [
             dbc.Card([
                 dbc.CardHeader([
                     html.H6("Club vs No Club Comparison", 
-                           className="mb-0 text-center",
-                           style={'color': '#34495e', 'fontWeight': '600'})
+                        className="mb-0 text-center",
+                        style={'color': '#34495e', 'fontWeight': '600'})
                 ]),
                 dbc.CardBody([
+                    # Graph section - reduced height
                     html.Div([
-                        html.I(className="fas fa-users fa-3x mb-3", 
-                              style={'color': '#9b59b6'}),
-                        dcc.Graph(figure=club_hours_comparison_bar()),
-                        dcc.Markdown(f'Club C.I.: {club_low} - {club_high}\nNo Club C.I.: {noclub_low} - {noclub_high}')
-                    ], className="d-flex flex-column align-items-center justify-content-center h-100")
-                ])
+                        dcc.Graph(
+                            figure=ci_line_chart(),
+                            style={'height': '220px'}
+                        )
+                    ], className="mb-2"),
+                    
+                    # Confidence intervals section - more compact
+                    html.Div([
+                        html.Div([
+                            html.Small("Club C.I:", 
+                                    style={'fontWeight': '600', 'color': '#34495e'}),
+                            html.Small(f" {club_low} - {club_high}", 
+                                    style={'marginLeft': '5px'})
+                        ], className="d-flex justify-content-center mb-1"),
+                        html.Div([
+                            html.Small("No Club C.I:", 
+                                    style={'fontWeight': '600', 'color': '#34495e'}),
+                            html.Small(f" {noclub_low} - {noclub_high}", 
+                                    style={'marginLeft': '5px'})
+                        ], className="d-flex justify-content-center")
+                    ], style={'fontSize': '12px'})
+                ], style={'padding': '15px'})  # Reduced padding
             ],
             className='shadow-sm',
             style={'height': '400px', 'marginBottom': '20px'}
