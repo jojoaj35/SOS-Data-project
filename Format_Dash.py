@@ -14,7 +14,7 @@ import math
 
 
 #Load dataset
-file_path = 'C:/Users/cln87/UTSA Files/CIS/SOS_Data/UTSA Client Dataset - Students of Service (SOS).xlsx'
+file_path = '/Users/joelwilson/Desktop/SOS-Data-project-1/UTSA Client Dataset - Students of Service (SOS).xlsx'
 
 clients_raw = pd.read_excel(file_path, sheet_name='Clients')  #Convert dates to datetime objects
 
@@ -146,12 +146,13 @@ def assign_countyincome(county):
     
 
 #Clean clients dataset
-clients = (clients_raw[clients_raw['Galaxy ID'].notna()] #Remove rows with no Galaxy ID
+clients_temp = (clients_raw[clients_raw['Galaxy ID'].notna()] #Remove rows with no Galaxy ID
                        .replace({'HS Graduation Year': '0', 'Age Now': 'Unknown'}, None) #Replace unknown ages and grad years with None instead of the string)
                        .replace({'Age at Sign Up' : {"Unknown":15, 0:15, 1:15, 4:15}}) #Replace unknown and too low ages at sign up with 16
                        .query('`Age at Sign Up` <= 20') #Filter out ages over 20
-                       [clients_raw['dateAdded'] >= dt.datetime(2020, 1, 1)] #Filter out clients added before 2020
 )
+
+clients = clients_temp[clients_temp['dateAdded'] >= dt.datetime(2020, 1, 1)] #Filter out clients added before 2020
 
 yes_no_cols = ['Learn Participation 2022', 
                'Explore Participation',
@@ -234,10 +235,15 @@ clients['Median Family Income'] = clients['Median Family Income'].astype('Int64'
 #Create function to get an income range
 def income_range(income):
     if pd.isnull(income): #ignore items with no income
-        None
+        return None
     else:
-        range_string = f'{int(str(income)[:-6])}0 - {int(str(income)[:-6])}9' #slice all but the thousands place then create range based off of that
-        return range_string
+        income_str = str(income)
+        if len(income_str) <= 6:  # Handle cases where income has 6 or fewer digits
+            return f"0 - 99"
+        else:
+            tens_thousands = income_str[:-6] if income_str[:-6] else "0"
+            range_string = f'{int(tens_thousands)}0 - {int(tens_thousands)}9' #slice all but the thousands place then create range based off of that
+            return range_string
 
 #Create an income range column based on the income_range(income) function
 clients['Income Range (Thousands)'] = clients['Median Family Income'].apply(income_range)
