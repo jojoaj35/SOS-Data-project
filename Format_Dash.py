@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import plotly.express as px
 import dash_bootstrap_components as dbc
-from dash import Dash, dcc, callback, Output, Input, html
+from dash import Dash, dcc, callback, Output, Input, html, dash_table
 import webbrowser
 from threading import Timer
 import datetime as dt
@@ -14,7 +14,7 @@ import math
 
 
 #Load dataset
-file_path = 'C:/Users/cln87/UTSA Files/CIS/SOS_Data/UTSA Client Dataset - Students of Service (SOS).xlsx'
+file_path = 'C:/Users/cln87/UTSA/UTSA2025/UTSA Client Dataset - Students of Service (SOS).xlsx'
 
 clients_raw = pd.read_excel(file_path, sheet_name='Clients')  #Convert dates to datetime objects
 
@@ -187,7 +187,8 @@ service_count = hours.groupby('Galaxy ID')['Event Date'].count()
 clients['Service Count'] = clients['Galaxy ID'].map(service_count)
 
 #Calculate active service length
-clients['Service Range'] = clients['Latest Service'] - clients['Earliest Service']  
+range_mask = (clients['Latest Service'] - clients['Earliest Service']).dt.days > 0
+clients.loc[range_mask, 'Service Range'] = clients['Latest Service'] - clients['Earliest Service']
 
 #Create a 'Follow Through' Column to show if client actualy volunteered after signing up
 clients['Follow Through'] = np.where(clients['Hours']>0, 1, 0).astype(int) 
@@ -257,20 +258,35 @@ def population_stat(df, col):
     Example:
     zip_agg, zip_flat = population_stat(clients, 'Zip Code')
     """
-    #Define columns and stats to get for each one while aggregating the target dataframe by target column
-    agg_name = df.groupby(by=col).agg(
-        {'Galaxy ID': 'count',
-        'Age at Sign Up': ['mean', 'median', 'min', 'max'],
-        'Service Range': 'mean',
-        'Hours': ['sum', 'mean'],
-        'Follow Through': ['sum', 'mean'],
-        'Trip Eligible (Yes/No)': ['sum', 'mean'],
-        'Service Count': ['mean', 'sum'],
-        'Responses' : ['mean', 'sum'],
-        'Make It Happen Badge (Yes/No)': ['sum', 'mean'],
-        'Scholarship Badge (Yes/No)': ['sum', 'mean'],
-        'Explore Participation': ['sum', 'mean'],}
-    )
+    #Define columns and stats to get for each one while aggregating the target dataframe by target column\
+    if col != 'Age at Sign Up':
+        agg_name = df.groupby(by=col).agg(
+            {'Galaxy ID': 'count',
+            'Age at Sign Up': ['mean', 'median', 'min', 'max'],
+            'Service Range': 'mean',
+            'Hours': ['sum', 'mean'],
+            'Follow Through': ['sum', 'mean'],
+            'Trip Eligible (Yes/No)': ['sum', 'mean'],
+            'Service Count': ['mean', 'sum'],
+            'Responses' : ['mean', 'sum'],
+            'Make It Happen Badge (Yes/No)': ['sum', 'mean'],
+            'Scholarship Badge (Yes/No)': ['sum', 'mean'],
+            'Explore Participation': ['sum', 'mean'],}
+        )
+
+    if col == 'Age at Sign Up':
+        agg_name = df.groupby(by=col).agg(
+            {'Galaxy ID': 'count',
+            'Service Range': 'mean',
+            'Hours': ['sum', 'mean'],
+            'Follow Through': ['sum', 'mean'],
+            'Trip Eligible (Yes/No)': ['sum', 'mean'],
+            'Service Count': ['mean', 'sum'],
+            'Responses' : ['mean', 'sum'],
+            'Make It Happen Badge (Yes/No)': ['sum', 'mean'],
+            'Scholarship Badge (Yes/No)': ['sum', 'mean'],
+            'Explore Participation': ['sum', 'mean'],}
+        )
 
     #Make service range stat more readable by only including days
     agg_name['Service Range'] = agg_name['Service Range','mean'].dt.days
@@ -337,7 +353,7 @@ def ci_line_chart():
 
     stacked_line.update_layout(
         title="Range for Average Hours given",
-        xaxis_title="Average Hours",
+        xaxis_title="Estimated Average Hours",
         yaxis_title="Club?",
         yaxis=dict(tickmode='array', tickvals=[0, 1], ticktext=['No Club', 'Club']),
         showlegend=False
@@ -345,17 +361,7 @@ def ci_line_chart():
 
     return stacked_line
 
-""""
-#Create schools with club volunteer hours comparison bar chart
-def club_hours_comparison_bar():
-    clubhours_filter = schoolclub_hours.copy()
-    clubhours_filter['Club'] = clubhours_filter['Club'].replace({'0':'No Club', '1':'Club'})
-    chart = px.bar(clubhours_filter.groupby(by='Club')['Hours'].mean().reset_index(), x='Club', y='Hours')
-    return chart
-"""
-
 #holds values for line graph
-vol_counts_store = {}
 app = Dash(__name__, external_stylesheets=[dbc.themes.SPACELAB])
 
 app.layout = dbc.Container([
@@ -373,7 +379,7 @@ app.layout = dbc.Container([
         # Main Dashboard Tab
         dbc.Tab(label="Dashboard", tab_id="dashboard", active_tab_style={"textTransform": "uppercase"}),
         # Secondary Tab  
-        dbc.Tab(label="Analytics", tab_id="analytics", active_tab_style={"textTransform": "uppercase"}),
+        dbc.Tab(label="Internal", tab_id="internal", active_tab_style={"textTransform": "uppercase"}),
     ], id="tabs", active_tab="dashboard", className="mb-3"),
     
     # Tab content
@@ -421,7 +427,7 @@ dashboard_layout = [
                         style={'color': '#34495e', 'fontWeight': '600'})
                 ]),
                 dbc.CardBody([
-                    # Graph section - reduced height
+                    # Graph
                     html.Div([
                         dcc.Graph(
                             figure=ci_line_chart(),
@@ -429,7 +435,7 @@ dashboard_layout = [
                         )
                     ], className="mb-2"),
                     
-                    # Confidence intervals section - more compact
+                    # Confidence
                     html.Div([
                         html.Div([
                             html.Small("Average Hours Given By Schools With Clubs:", 
@@ -444,7 +450,7 @@ dashboard_layout = [
                                     style={'marginLeft': '5px'})
                         ], className="d-flex justify-content-center")
                     ], style={'fontSize': '18px'})
-                ], style={'padding': '15px'})  # Reduced padding
+                ], style={'padding': '15px'})  
             ],
             className='shadow-sm',
             style={'height': '400px', 'marginBottom': '20px'}
@@ -491,7 +497,7 @@ dashboard_layout = [
                               style={'color': '#27ae60'}),
                         html.H2(f"${get_hours_value()}", 
                                className='mb-0',
-                               style={'color': '#27ae60', 'fontWeight': 'bold'})
+                               style={'color': '#27ae60', 'fontWeight': 'bold', 'fontSize':'80px'})
                     ], className="text-center d-flex flex-column align-items-center justify-content-center h-100")
                 ])
             ],
@@ -524,8 +530,21 @@ dashboard_layout = [
     ])
 ]
 
-# Analytics Tab Layout (Second page)
-analytics_layout = [
+# Analytics Tab Layout 
+internal_layout = [
+    # Sub-tabs within Internal tab
+    dbc.Tabs([
+        dbc.Tab(label="Settings", tab_id="settings-sub", active_tab_style={"textTransform": "uppercase"}),
+        dbc.Tab(label="Analytics", tab_id="analytics-sub", active_tab_style={"textTransform": "uppercase"}),
+        dbc.Tab(label="Reports", tab_id="reports-sub", active_tab_style={"textTransform": "uppercase"}),
+    ], id="internal-subtabs", active_tab="settings-sub", className="mb-3"),
+    
+    # Sub-tab content container
+    html.Div(id="internal-subtab-content")
+]
+
+# Analytics sub-tab layout (your original analytics content)
+analytics_subtab_layout = [
     dbc.Row([
         dbc.Col([
             dbc.Card([
@@ -547,40 +566,58 @@ analytics_layout = [
             ], className='shadow-sm', style={'height': '400px'})
         ], width=12, className="mb-3")
     ]),
-    
+]
+
+# Reports sub-tab layout
+reports_subtab_layout = [
     dbc.Row([
         dbc.Col([
             dbc.Card([
                 dbc.CardHeader([
-                    html.H6("Geographic Analysis", className="mb-0 text-center")
+                    html.H5("Reports Dashboard", 
+                           className="mb-0 text-center",
+                           style={'color': '#34495e', 'fontWeight': '600'})
                 ]),
                 dbc.CardBody([
                     html.Div([
-                        html.I(className="fas fa-map-marked-alt fa-3x mb-2", 
-                              style={'color': '#3498db'}),
-                        html.P("Interactive map visualization", 
-                              className="text-muted mb-0")
+                        html.I(className="fas fa-file-alt fa-4x mb-3", 
+                              style={'color': '#f39c12'}),
+                        html.H4("Reports Section", className="mb-2"),
+                        html.P("Generate and manage reports here", 
+                              className="text-muted",
+                              style={'fontSize': '18px'})
                     ], className="d-flex flex-column align-items-center justify-content-center h-100")
                 ])
-            ], className='shadow-sm', style={'height': '300px'})
-        ], width=6),
-        
+            ], className='shadow-sm', style={'height': '400px'})
+        ], width=12)
+    ])
+]
+
+# Settings sub-tab layout
+settings_subtab_layout = [
+    dbc.Row([
         dbc.Col([
             dbc.Card([
                 dbc.CardHeader([
-                    html.H6("Report Generation", className="mb-0 text-center")
+                    html.H5("Population Statistics", 
+                            className="mb-0 text-center",
+                            style={'color': '#34495e', 'fontWeight': '600'})
                 ]),
-                dbc.CardBody([
-                    html.Div([
-                        dbc.Button("Generate Monthly Report", color="primary", className="mb-3 w-75"),
-                        dbc.Button("Export Data", color="secondary", className="mb-3 w-75"),
-                        dbc.Button("Download Charts", color="info", className="w-75")
-                    ], className="d-flex flex-column align-items-center justify-content-center h-100")
-                ])
-            ], className='shadow-sm', style={'height': '300px'})
-        ], width=6)
+                dcc.Dropdown(
+                    id='popstat-drop',
+                    options=[{'label': col, 'value': col} for col in ['Zip Code', 'Age at Sign Up', 'Age Now',
+                        'School', 'District', 'Race/Ethnicity', 'Gender']],
+                    value='District',
+                ),
+                dbc.CardBody(
+                    html.Div(id='popstat-table-container')
+                )
+            ], className='shadow-sm', style={'height': '400px'})
+        ], className="d-flex flex-column align-items-center justify-content-center h-100")
     ])
 ]
+    
+
 
 # Callback for tab switching
 @callback(
@@ -590,9 +627,23 @@ analytics_layout = [
 def switch_tab(active_tab):
     if active_tab == "dashboard":
         return dashboard_layout
-    elif active_tab == "analytics":  
-        return analytics_layout
+    elif active_tab == "internal":  
+        return internal_layout
     return dashboard_layout
+
+# Callback for internal sub-tab switching
+@callback(
+    Output("internal-subtab-content", "children"),
+    Input("internal-subtabs", "active_tab")
+)
+def switch_internal_subtab(active_subtab):
+    if active_subtab == "analytics-sub":
+        return analytics_subtab_layout
+    elif active_subtab == "reports-sub":
+        return reports_subtab_layout
+    elif active_subtab == "settings-sub":
+        return settings_subtab_layout
+    return analytics_subtab_layout
 
 @callback(
     Output('test-graph','figure'),
@@ -617,6 +668,14 @@ def pie_chart(age):
     )
     return pie
 
+@callback(
+    Output('popstat-table-container', 'children'),
+    Input('popstat-drop', 'value')
+)
+def popstat_dashtable(popstat):
+    agg_stat, flat_stat = population_stat(clients, popstat)
+    return dbc.Table.from_dataframe(agg_stat.reset_index().sort_values(by=popstat))
+
 if __name__ == '__main__':
     Timer(1, lambda: webbrowser.open("http://localhost:8000")).start()
-    app.run(debug=False, host= 'localhost', port=8000) 
+    app.run(debug=False, host= 'localhost', port=8000)
