@@ -14,7 +14,7 @@ import math
 
 
 #Load dataset
-file_path = 'C:/Users/cln87/UTSA/UTSA2025/UTSA Client Dataset - Students of Service (SOS).xlsx'
+file_path = 'C:/Users/cln87/UTSA Files/CIS/SOS_Data/UTSA Client Dataset - Students of Service (SOS).xlsx'
 
 clients_raw = pd.read_excel(file_path, sheet_name='Clients')  #Convert dates to datetime objects
 
@@ -246,6 +246,29 @@ clients['Income Range (Thousands)'] = clients['Median Family Income'].apply(inco
 curr_year=max(clients['Latest Service']).year
 curr_month=max(clients['Latest Service']).month
 
+general_agg_stats = {'Galaxy ID': 'count',
+            'Age at Sign Up': ['mean', 'median', 'min', 'max'],
+            'Service Range': 'mean',
+            'Hours': ['sum', 'mean'],
+            'Follow Through': ['sum', 'mean'],
+            'Trip Eligible (Yes/No)': ['sum', 'mean'],
+            'Service Count': ['mean', 'sum'],
+            'Responses' : ['mean', 'sum'],
+            'Make It Happen Badge (Yes/No)': ['sum', 'mean'],
+            'Scholarship Badge (Yes/No)': ['sum', 'mean'],
+            'Explore Participation': ['sum', 'mean']}
+
+age_agg_stats = {'Galaxy ID': 'count',
+            'Service Range': 'mean',
+            'Hours': ['sum', 'mean'],
+            'Follow Through': ['sum', 'mean'],
+            'Trip Eligible (Yes/No)': ['sum', 'mean'],
+            'Service Count': ['mean', 'sum'],
+            'Responses' : ['mean', 'sum'],
+            'Make It Happen Badge (Yes/No)': ['sum', 'mean'],
+            'Scholarship Badge (Yes/No)': ['sum', 'mean'],
+            'Explore Participation': ['sum', 'mean']}
+
 def population_stat(df, col):
     """
     This function will create two dataframes based around the specific column provided.
@@ -261,31 +284,12 @@ def population_stat(df, col):
     #Define columns and stats to get for each one while aggregating the target dataframe by target column\
     if col != 'Age at Sign Up':
         agg_name = df.groupby(by=col).agg(
-            {'Galaxy ID': 'count',
-            'Age at Sign Up': ['mean', 'median', 'min', 'max'],
-            'Service Range': 'mean',
-            'Hours': ['sum', 'mean'],
-            'Follow Through': ['sum', 'mean'],
-            'Trip Eligible (Yes/No)': ['sum', 'mean'],
-            'Service Count': ['mean', 'sum'],
-            'Responses' : ['mean', 'sum'],
-            'Make It Happen Badge (Yes/No)': ['sum', 'mean'],
-            'Scholarship Badge (Yes/No)': ['sum', 'mean'],
-            'Explore Participation': ['sum', 'mean'],}
+            general_agg_stats
         )
 
     if col == 'Age at Sign Up':
         agg_name = df.groupby(by=col).agg(
-            {'Galaxy ID': 'count',
-            'Service Range': 'mean',
-            'Hours': ['sum', 'mean'],
-            'Follow Through': ['sum', 'mean'],
-            'Trip Eligible (Yes/No)': ['sum', 'mean'],
-            'Service Count': ['mean', 'sum'],
-            'Responses' : ['mean', 'sum'],
-            'Make It Happen Badge (Yes/No)': ['sum', 'mean'],
-            'Scholarship Badge (Yes/No)': ['sum', 'mean'],
-            'Explore Participation': ['sum', 'mean'],}
+            age_agg_stats
         )
 
     #Make service range stat more readable by only including days
@@ -606,7 +610,7 @@ settings_subtab_layout = [
                 dcc.Dropdown(
                     id='popstat-drop',
                     options=[{'label': col, 'value': col} for col in ['Zip Code', 'Age at Sign Up', 'Age Now',
-                        'School', 'District', 'Race/Ethnicity', 'Gender']],
+                        'School', 'District', 'Race/Ethnicity', 'Gender', 'Income Range (Thousands)']],
                     value='District',
                 ),
                 dbc.CardBody(
