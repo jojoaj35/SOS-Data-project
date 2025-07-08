@@ -338,27 +338,33 @@ def get_club_ci():
 
         #Get interval bounds for clubs by getting mu, sigma, and n. Then gets the inverse t for that sample
         club_data = schoolclub_hours[schoolclub_hours['Club']=='1']['Hours']
-        if len(club_data) == 0:
+        if len(club_data) <= 1:
             club_lower, club_upper = 0, 0
         else:
             club_mu = club_data.mean()
-            club_sigma = stat.stdev(club_data)
-            club_n = len(club_data)
-            club_conf_t = abs(round(scipystat.t.ppf(alpha/2, club_n-1),2))
-            club_lower = round(club_mu - club_conf_t*(club_sigma/math.sqrt(club_n)),2)
-            club_upper = round(club_mu + club_conf_t*(club_sigma/math.sqrt(club_n)),2)
+            if len(club_data) == 1:
+                club_lower = club_upper = club_mu
+            else:
+                club_sigma = stat.stdev(club_data)
+                club_n = len(club_data)
+                club_conf_t = abs(round(scipystat.t.ppf(alpha/2, club_n-1),2))
+                club_lower = round(club_mu - club_conf_t*(club_sigma/math.sqrt(club_n)),2)
+                club_upper = round(club_mu + club_conf_t*(club_sigma/math.sqrt(club_n)),2)
 
         #Same calculation but for the no club sample
         noclub_data = schoolclub_hours[schoolclub_hours['Club']=='0']['Hours']
-        if len(noclub_data) == 0:
+        if len(noclub_data) <= 1:
             noclub_lower, noclub_upper = 0, 0
         else:
             noclub_mu = noclub_data.mean()
-            noclub_sigma = stat.stdev(noclub_data)
-            noclub_n = len(noclub_data)
-            noclub_conf_t = abs(round(scipystat.t.ppf(alpha/2, noclub_n-1),2))
-            noclub_lower = round(noclub_mu - noclub_conf_t*(noclub_sigma/math.sqrt(noclub_n)),2)
-            noclub_upper = round(noclub_mu + noclub_conf_t*(noclub_sigma/math.sqrt(noclub_n)),2)
+            if len(noclub_data) == 1:
+                noclub_lower = noclub_upper = noclub_mu
+            else:
+                noclub_sigma = stat.stdev(noclub_data)
+                noclub_n = len(noclub_data)
+                noclub_conf_t = abs(round(scipystat.t.ppf(alpha/2, noclub_n-1),2))
+                noclub_lower = round(noclub_mu - noclub_conf_t*(noclub_sigma/math.sqrt(noclub_n)),2)
+                noclub_upper = round(noclub_mu + noclub_conf_t*(noclub_sigma/math.sqrt(noclub_n)),2)
 
         return club_lower, club_upper, noclub_lower, noclub_upper
     except:
@@ -464,26 +470,13 @@ dashboard_layout = [
                     # Graph
                     html.Div([
                         dcc.Graph(
-                            figure=ci_line_chart(),
+                            id='club-comparison-chart',
                             style={'height': '220px'}
                         )
                     ], className="mb-2"),
                     
-                    # Confidence
-                    html.Div([
-                        html.Div([
-                            html.Small("Average Hours Given By Schools With Clubs:", 
-                                    style={'fontWeight': '600', 'color': '#34495e'}),
-                            html.Small(f" {club_low} - {club_high}", 
-                                    style={'marginLeft': '5px'})
-                        ], className="d-flex justify-content-center mb-1"),
-                        html.Div([
-                            html.Small("Average Hours Give By Schools Without Clubs:", 
-                                    style={'fontWeight': '600', 'color': '#34495e'}),
-                            html.Small(f" {noclub_low} - {noclub_high}", 
-                                    style={'marginLeft': '5px'})
-                        ], className="d-flex justify-content-center")
-                    ], style={'fontSize': '18px'})
+                    # Confidence intervals
+                    html.Div(id='club-confidence-intervals', style={'fontSize': '18px'})
                 ], style={'padding': '15px'})  
             ],
             className='shadow-sm',
@@ -500,12 +493,7 @@ dashboard_layout = [
                 ]),
                 dbc.CardBody([
                     dcc.Graph(
-                        figure=px.line(qtr_vol_counts, x='QTR', y='Active Volunteers')
-                                .update_layout(
-                                    margin=dict(l=30, r=30, t=20, b=30),
-                                    font=dict(size=12),
-                                    height=340
-                                ),
+                        id='quarter-volunteers-chart',
                         style={'height': '340px'}
                     )
                 ])
@@ -529,7 +517,7 @@ dashboard_layout = [
                     html.Div([
                         html.I(className="fas fa-dollar-sign fa-3x mb-3", 
                               style={'color': '#27ae60'}),
-                        html.H2(f"${get_hours_value()}", 
+                        html.H2(id='total-value-display', 
                                className='mb-0',
                                style={'color': '#27ae60', 'fontWeight': 'bold', 'fontSize':'80px'})
                     ], className="text-center d-flex flex-column align-items-center justify-content-center h-100")
@@ -769,6 +757,107 @@ file_uploader_layout = [
 ]
     
 
+
+# Callback for club comparison chart
+@callback(
+    [Output('club-comparison-chart', 'figure'),
+     Output('club-confidence-intervals', 'children')],
+    [Input('upload-data', 'contents')]
+)
+def update_club_comparison(contents):
+    if clients.empty or schoolclub_hours.empty:
+        # Empty state
+        empty_fig = px.line(x=[0, 1], y=[0, 1])
+        empty_fig.update_layout(
+            title="Upload data to view Club vs No Club comparison",
+            xaxis_title="Hours Range",
+            yaxis_title="Club Status",
+            height=220,
+            margin=dict(l=20, r=20, t=40, b=20)
+        )
+        
+        empty_intervals = html.Div([
+            html.P("Upload data to see confidence intervals", 
+                   className="text-muted text-center")
+        ])
+        
+        return empty_fig, empty_intervals
+    
+    # Create updated chart
+    club_low, club_high, noclub_low, noclub_high = get_club_ci()
+    
+    ci_data = pd.DataFrame([
+        {'x':noclub_low, 'Category':0},
+        {'x':noclub_high, 'Category':0},
+        {'x':club_low, 'Category':1},
+        {'x':club_high, 'Category':1}
+    ])
+    
+    fig = px.line(ci_data, x='x', y='Category', color='Category', 
+                  markers=True, line_shape='linear')
+    fig.update_layout(
+        title="Range for Average Hours Given",
+        xaxis_title="Estimated Average Hours",
+        yaxis_title="Club?",
+        yaxis=dict(tickmode='array', tickvals=[0, 1], ticktext=['No Club', 'Club']),
+        showlegend=False,
+        height=220,
+        margin=dict(l=20, r=20, t=40, b=20)
+    )
+    
+    # Create confidence intervals display
+    intervals_display = html.Div([
+        html.Div([
+            html.Small("Average Hours Given By Schools With Clubs:", 
+                    style={'fontWeight': '600', 'color': '#34495e'}),
+            html.Small(f" {club_low} - {club_high}", 
+                    style={'marginLeft': '5px'})
+        ], className="d-flex justify-content-center mb-1"),
+        html.Div([
+            html.Small("Average Hours Given By Schools Without Clubs:", 
+                    style={'fontWeight': '600', 'color': '#34495e'}),
+            html.Small(f" {noclub_low} - {noclub_high}", 
+                    style={'marginLeft': '5px'})
+        ], className="d-flex justify-content-center")
+    ])
+    
+    return fig, intervals_display
+
+# Callback for quarter volunteers chart
+@callback(
+    Output('quarter-volunteers-chart', 'figure'),
+    Input('upload-data', 'contents')
+)
+def update_quarter_chart(contents):
+    if qtr_vol_counts.empty:
+        # Empty state
+        empty_fig = px.line(x=[0], y=[0])
+        empty_fig.update_layout(
+            title="Upload data to view Active Volunteers by Quarter",
+            xaxis_title="Quarter",
+            yaxis_title="Active Volunteers",
+            height=340,
+            margin=dict(l=30, r=30, t=40, b=30)
+        )
+        return empty_fig
+    
+    # Create updated chart with actual data
+    fig = px.line(qtr_vol_counts, x='QTR', y='Active Volunteers', markers=True)
+    fig.update_layout(
+        title="Active Volunteers by Quarter",
+        margin=dict(l=30, r=30, t=40, b=30),
+        font=dict(size=12),
+        height=340
+    )
+    return fig
+
+# Callback for total value display
+@callback(
+    Output('total-value-display', 'children'),
+    Input('upload-data', 'contents')
+)
+def update_total_value(contents):
+    return f"${get_hours_value()}"
 
 # Callback for tab switching
 @callback(
@@ -1012,17 +1101,50 @@ def handle_file_upload(contents, filename):
                 columns=['QTR', 'Active Volunteers']
             )
             
-            return dbc.Alert(
-                [
+            # Create detailed data cleaning success message
+            preprocessing_summary = html.Div([
+                dbc.Alert([
                     html.I(className="fas fa-check-circle me-2"),
-                    f"Successfully uploaded {filename}! "
-                    f"Loaded {len(clients_raw)} clients, {len(hours)} service hours records, "
-                    f"and {len(survey_raw)} survey responses. "
-                    "Switch to the Dashboard tab to see the updated data."
-                ],
-                color="success",
-                dismissable=True
-            )
+                    html.Strong("File Upload Successful!"),
+                    html.Br(),
+                    f"📁 Uploaded: {filename}",
+                    html.Br(),
+                    f"📊 Raw data loaded: {len(clients_raw)} clients, {len(hours)} service hours, {len(survey_raw)} survey responses"
+                ], color="success", className="mb-2"),
+                
+                dbc.Alert([
+                    html.I(className="fas fa-cogs me-2"),
+                    html.Strong("Data Cleaning Pipeline Completed Successfully!"),
+                    html.Br(),
+                    html.Ul([
+                        html.Li(f"✅ Filtered clients: {len(clients)} records after cleaning"),
+                        html.Li(f"✅ Generated derived columns: Service Range, Follow Through, Club status"),
+                        html.Li(f"✅ Assigned geographic data: Counties and income ranges"),
+                        html.Li(f"✅ Calculated quarter aggregations: {len(qtr_vol_counts)} quarters"),
+                        html.Li(f"✅ School club analysis: {len(schoolclub_hours)} schools processed"),
+                        html.Li(f"✅ Confidence intervals calculated (α=0.05)")
+                    ], className="mb-2"),
+                    html.Hr(),
+                    html.P([
+                        html.Strong("Data Quality Metrics:"),
+                        html.Br(),
+                        f"• Follow-through rate: {clients['Follow Through'].mean()*100:.1f}% of clients volunteered",
+                        html.Br(),
+                        f"• Average service hours per active client: {clients[clients['Hours']>0]['Hours'].mean():.1f}",
+                        html.Br(),
+                        f"• Total volunteer value: ${get_hours_value()} (at $31/hour)",
+                        html.Br(),
+                        f"• Schools with clubs: {len(schoolclub_hours[schoolclub_hours['Club']=='1'])} of {len(schoolclub_hours)}"
+                    ], className="mb-0", style={'fontSize': '14px'})
+                ], color="info", className="mb-2"),
+                
+                dbc.Alert([
+                    html.I(className="fas fa-chart-line me-2"),
+                    "🎯 Dashboard ready! Switch to the Dashboard tab to explore your data visualizations."
+                ], color="primary")
+            ])
+            
+            return preprocessing_summary
             
         else:
             return dbc.Alert(
