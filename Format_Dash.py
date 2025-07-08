@@ -21,16 +21,11 @@ from events_analysis import (
 )
 from heatmap import create_heatmap_from_dataframe
 
-#Load dataset
-file_path = '/Users/joelwilson/Desktop/sos data project 3/UTSA Client Dataset - Students of Service (SOS).xlsx'
-
-clients_raw = pd.read_excel(file_path, sheet_name='Clients')  #Convert dates to datetime objects
-
-hours = (pd.read_excel(file_path, sheet_name='Service Hours') #Rename the userID column to 'Galaxy ID'
-         .rename({'userId': 'Galaxy ID'}, axis=1)
-)
-
-survey_raw = pd.read_excel(file_path, sheet_name='Survey Responses')
+# Initialize empty datasets - data will be loaded through File Uploader tab
+clients_raw = pd.DataFrame()
+hours = pd.DataFrame()
+survey_raw = pd.DataFrame()
+clients = pd.DataFrame()
 
 
 #Zip code lists for county assignemnts
@@ -153,13 +148,9 @@ def assign_countyincome(county):
         return round(int(county_incomes[county_incomes['County']==county]['Median Income'].values[0]))
     
 
-#Clean clients dataset
-clients = (clients_raw[clients_raw['Galaxy ID'].notna()] #Remove rows with no Galaxy ID
-                       .replace({'HS Graduation Year': '0', 'Age Now': 'Unknown'}, None) #Replace unknown ages and grad years with None instead of the string)
-                       .replace({'Age at Sign Up' : {"Unknown":15, 0:15, 1:15, 4:15}}) #Replace unknown and too low ages at sign up with 16
-                       .query('`Age at Sign Up` <= 20') #Filter out ages over 20
-                       [clients_raw['dateAdded'] >= dt.datetime(2020, 1, 1)] #Filter out clients added before 2020
-)
+# Data cleaning will happen after file upload in the upload callback
+# Initialize clients as empty dataframe
+# clients = pd.DataFrame()
 
 yes_no_cols = ['Learn Participation 2022', 
                'Explore Participation',
@@ -172,46 +163,46 @@ schools_with_clubs = ['Brackenridge High School','Whittier Middle School', 'Dris
                       'Churchill High School', 'Johnson High School', 'CAST Tech High School' , 'IDEA Converse', 'RISE Inspire Academy', 
                       'Nimitz Middle School', 'Thomas Jefferson High School', "Young Men's Leadership Academy", 'Southside High School']
 
-#Convert Yes/No columns to 1/0
-clients[yes_no_cols] = clients[yes_no_cols].replace({'Yes': 1, 'No': 0}) 
+# Data processing moved to upload callback - will execute after file upload
+# #Convert Yes/No columns to 1/0
+# clients[yes_no_cols] = clients[yes_no_cols].replace({'Yes': 1, 'No': 0}) 
 
-#Truncate zip coes to 5 digits
-clients['Zip Code'] = pd.to_numeric(clients['Zip Code'].astype(str).str[:5]) 
+# #Truncate zip coes to 5 digits
+# clients['Zip Code'] = pd.to_numeric(clients['Zip Code'].astype(str).str[:5]) 
 
-#Create a new column for hours collected from hours table to compare to hours in original table
-hours_sum = hours.groupby('Galaxy ID')['hours'].sum()
-clients['Collected Hours'] = clients['Galaxy ID'].map(hours_sum) 
+# #Create a new column for hours collected from hours table to compare to hours in original table
+# hours_sum = hours.groupby('Galaxy ID')['hours'].sum()
+# clients['Collected Hours'] = clients['Galaxy ID'].map(hours_sum) 
 
-#Get earliest volunteer date for each ID
-earliest_service = hours.groupby('Galaxy ID')['Event Date'].min()  
-clients['Earliest Service'] = clients['Galaxy ID'].map(earliest_service)
+# #Get earliest volunteer date for each ID
+# earliest_service = hours.groupby('Galaxy ID')['Event Date'].min()  
+# clients['Earliest Service'] = clients['Galaxy ID'].map(earliest_service)
 
-#Get latest volunteer date for each ID
-latest_service = hours.groupby('Galaxy ID')['Event Date'].max()   
-clients['Latest Service'] = clients['Galaxy ID'].map(latest_service)
+# #Get latest volunteer date for each ID
+# latest_service = hours.groupby('Galaxy ID')['Event Date'].max()   
+# clients['Latest Service'] = clients['Galaxy ID'].map(latest_service)
 
-#Get total events per ID
-service_count = hours.groupby('Galaxy ID')['Event Date'].count()  
-clients['Service Count'] = clients['Galaxy ID'].map(service_count)
+# #Get total events per ID
+# service_count = hours.groupby('Galaxy ID')['Event Date'].count()  
+# clients['Service Count'] = clients['Galaxy ID'].map(service_count)
 
-#Calculate active service length
-range_mask = (clients['Latest Service'] - clients['Earliest Service']).dt.days > 0
-clients.loc[range_mask, 'Service Range'] = clients['Latest Service'] - clients['Earliest Service']
+# #Calculate active service length
+# range_mask = (clients['Latest Service'] - clients['Earliest Service']).dt.days > 0
+# clients.loc[range_mask, 'Service Range'] = clients['Latest Service'] - clients['Earliest Service']
 
-#Create a 'Follow Through' Column to show if client actualy volunteered after signing up
-clients['Follow Through'] = np.where(clients['Hours']>0, 1, 0).astype(int) 
+# #Create a 'Follow Through' Column to show if client actualy volunteered after signing up
+# clients['Follow Through'] = np.where(clients['Hours']>0, 1, 0).astype(int) 
 
-#Create 'Club' column to show if a club exists at a clients school
-clients['Club'] = np.where(clients['School'].isin(schools_with_clubs),1,0).astype(int)
+# #Create 'Club' column to show if a club exists at a clients school
+# clients['Club'] = np.where(clients['School'].isin(schools_with_clubs),1,0).astype(int)
 
-hours['qtr-year'] = (
-    hours['Event Date'].dt.year.astype(str) +
-    '-Q' + hours['Event Date'].dt.quarter.astype(str)
-)
+# hours['qtr-year'] = (
+#     hours['Event Date'].dt.year.astype(str) +
+#     '-Q' + hours['Event Date'].dt.quarter.astype(str)
+# )
 
-qtr_vol_counts = month_vol_counts = pd.DataFrame(
-    list(hours.groupby('qtr-year')['Galaxy ID'].nunique().to_dict().items()), columns=['QTR', 'Active Volunteers']
-)
+# Initialize empty quarter data - will be updated after file upload
+qtr_vol_counts = pd.DataFrame(columns=['QTR', 'Active Volunteers'])
 
 #Match zip codes to counties
 def county_assign(zip):            
@@ -219,25 +210,28 @@ def county_assign(zip):
         if zip in county_zips[key]:
             return key
 
-#Match zip codes to counties
-clients['County'] = clients['Zip Code'].apply(county_assign)  
+# County assignment moved to upload callback
+# #Match zip codes to counties
+# clients['County'] = clients['Zip Code'].apply(county_assign)  
 
-#Assign incomes by zip code or county
-for id in clients['Galaxy ID'].values:   #iterate through galaxy ids
+# Income assignment moved to upload callback
+# #Assign incomes by zip code or county
+# for id in clients['Galaxy ID'].values:   #iterate through galaxy ids
 
-    zip_of_id = clients.loc[clients['Galaxy ID']==id, 'Zip Code'].values[0]   #obtain zip code for the galaxy id
-    county_of_id = clients.loc[clients['Galaxy ID']==id, 'County'].values[0]  #obtain county for the galaxy id
+#     zip_of_id = clients.loc[clients['Galaxy ID']==id, 'Zip Code'].values[0]   #obtain zip code for the galaxy id
+#     county_of_id = clients.loc[clients['Galaxy ID']==id, 'County'].values[0]  #obtain county for the galaxy id
 
-    if zip_of_id in zip_incomes.values:  #check if the zip code has a zip specific income
-        clients.loc[clients['Galaxy ID']==id, 'Median Family Income'] = assign_zipincome(zip_of_id)  #assign income based on zip code
-    else:
-        if county_of_id in county_zips.keys():   #check if county is in the area
-            clients.loc[clients['Galaxy ID']==id, 'Median Family Income'] = assign_countyincome(county_of_id)   #assign income based on county
-        else:
-            clients.loc[clients['Galaxy ID']==id, 'Median Family Income'] = None  #if zip code is outside range, assign 'None' to income
+#     if zip_of_id in zip_incomes.values:  #check if the zip code has a zip specific income
+#         clients.loc[clients['Galaxy ID']==id, 'Median Family Income'] = assign_zipincome(zip_of_id)  #assign income based on zip code
+#     else:
+#         if county_of_id in county_zips.keys():   #check if county is in the area
+#             clients.loc[clients['Galaxy ID']==id, 'Median Family Income'] = assign_countyincome(county_of_id)   #assign income based on county
+#         else:
+#             clients.loc[clients['Galaxy ID']==id, 'Median Family Income'] = None  #if zip code is outside range, assign 'None' to income
 
-#Change type of median family income to an integer
-clients['Median Family Income'] = clients['Median Family Income'].astype('Int64')
+# Income type conversion moved to upload callback
+# #Change type of median family income to an integer
+# clients['Median Family Income'] = clients['Median Family Income'].astype('Int64')
 
 #Create function to get an income range
 def income_range(income):
@@ -247,12 +241,14 @@ def income_range(income):
         range_string = f'{int(str(income)[:-6])}0 - {int(str(income)[:-6])}9' #slice all but the thousands place then create range based off of that
         return range_string
 
-#Create an income range column based on the income_range(income) function
-clients['Income Range (Thousands)'] = clients['Median Family Income'].apply(income_range)
+# Income range creation moved to upload callback
+# #Create an income range column based on the income_range(income) function
+# clients['Income Range (Thousands)'] = clients['Median Family Income'].apply(income_range)
 
-#get current year and month to iterate up to
-curr_year=max(clients['Latest Service']).year
-curr_month=max(clients['Latest Service']).month
+# Current year/month calculation moved to upload callback
+# #get current year and month to iterate up to
+# curr_year=max(clients['Latest Service']).year
+# curr_month=max(clients['Latest Service']).month
 
 general_agg_stats = {'Galaxy ID': 'count',
             'Age at Sign Up': ['mean', 'median', 'min', 'max'],
@@ -318,37 +314,55 @@ def population_stat(df, col):
 
 #Get value of hours using 31 dollars per hour then format in dollar format
 def get_hours_value():
+    if clients.empty or 'Hours' not in clients.columns:
+        return '0.00'
     return '{:,.2f}'.format(clients['Hours'].sum()*31)
 
-#Create dataframe with school based volunteer hours means depending on whether they have a club or not.
-schoolclub_hours = clients.groupby(by='School').agg({'Hours':'sum'}).reset_index()
-schoolclub_hours['Club'] = np.where(schoolclub_hours['School'].isin(schools_with_clubs),1,0).astype(str)
+# School club analysis moved to upload callback - will be updated after data load
+# #Create dataframe with school based volunteer hours means depending on whether they have a club or not.
+# schoolclub_hours = clients.groupby(by='School').agg({'Hours':'sum'}).reset_index()
+# schoolclub_hours['Club'] = np.where(schoolclub_hours['School'].isin(schools_with_clubs),1,0).astype(str)
+
+# Initialize empty schoolclub_hours for functions
+schoolclub_hours = pd.DataFrame(columns=['School', 'Hours', 'Club'])
 
 #returns the lower and upper margin of error limits for schools with clubs vs schools without clubs
 def get_club_ci():
-    #confidence for the confidence interval
-    alpha=0.05
+    # Return default values if no data is available
+    if schoolclub_hours.empty or len(schoolclub_hours) == 0:
+        return 0, 0, 0, 0
+    
+    try:
+        #confidence for the confidence interval
+        alpha=0.05
 
-    #Get interval bounds for clubs by getting mu, sigma, and n. Then gets the inverse t for that sample
-    club_mu = schoolclub_hours[schoolclub_hours['Club']=='1']['Hours'].mean()
-    club_sigma = stat.stdev(schoolclub_hours[schoolclub_hours['Club']=='1']['Hours'])
-    club_n = len(schoolclub_hours[schoolclub_hours['Club']=='1'])
-    club_conf_t = abs(round(scipystat.t.ppf(alpha/2, club_n-1),2))
+        #Get interval bounds for clubs by getting mu, sigma, and n. Then gets the inverse t for that sample
+        club_data = schoolclub_hours[schoolclub_hours['Club']=='1']['Hours']
+        if len(club_data) == 0:
+            club_lower, club_upper = 0, 0
+        else:
+            club_mu = club_data.mean()
+            club_sigma = stat.stdev(club_data)
+            club_n = len(club_data)
+            club_conf_t = abs(round(scipystat.t.ppf(alpha/2, club_n-1),2))
+            club_lower = round(club_mu - club_conf_t*(club_sigma/math.sqrt(club_n)),2)
+            club_upper = round(club_mu + club_conf_t*(club_sigma/math.sqrt(club_n)),2)
 
-    #Same calculation but for the no club sample
-    noclub_mu = schoolclub_hours[schoolclub_hours['Club']=='0']['Hours'].mean()
-    noclub_sigma = stat.stdev(schoolclub_hours[schoolclub_hours['Club']=='0']['Hours'])
-    noclub_n = len(schoolclub_hours[schoolclub_hours['Club']=='0'])
-    noclub_conf_t = abs(round(scipystat.t.ppf(alpha/2, noclub_n-1),2))
+        #Same calculation but for the no club sample
+        noclub_data = schoolclub_hours[schoolclub_hours['Club']=='0']['Hours']
+        if len(noclub_data) == 0:
+            noclub_lower, noclub_upper = 0, 0
+        else:
+            noclub_mu = noclub_data.mean()
+            noclub_sigma = stat.stdev(noclub_data)
+            noclub_n = len(noclub_data)
+            noclub_conf_t = abs(round(scipystat.t.ppf(alpha/2, noclub_n-1),2))
+            noclub_lower = round(noclub_mu - noclub_conf_t*(noclub_sigma/math.sqrt(noclub_n)),2)
+            noclub_upper = round(noclub_mu + noclub_conf_t*(noclub_sigma/math.sqrt(noclub_n)),2)
 
-    #Calculate club and no club confidence interval bounds
-    club_lower = round(club_mu - club_conf_t*(club_sigma/math.sqrt(club_n)),2)
-    club_upper = round(club_mu + club_conf_t*(club_sigma/math.sqrt(club_n)),2)
-
-    noclub_lower = round(noclub_mu - noclub_conf_t*(noclub_sigma/math.sqrt(noclub_n)),2)
-    noclub_upper = round(noclub_mu + noclub_conf_t*(noclub_sigma/math.sqrt(noclub_n)),2)
-
-    return club_lower, club_upper, noclub_lower, noclub_upper
+        return club_lower, club_upper, noclub_lower, noclub_upper
+    except:
+        return 0, 0, 0, 0
 
 club_low, club_high, noclub_low, noclub_high = get_club_ci()
 
@@ -427,7 +441,7 @@ dashboard_layout = [
                         dcc.Dropdown(
                             id='age-drop',
                             options=[{'label': f'Age {age}', 'value': age} 
-                                    for age in sorted(clients['Age at Sign Up'].unique())],
+                                    for age in sorted(clients['Age at Sign Up'].unique())] if not clients.empty and 'Age at Sign Up' in clients.columns else [{'label': 'Upload data first', 'value': 16}],
                             value=16,
                             style={'marginBottom': '10px'}
                         )
@@ -716,13 +730,13 @@ file_uploader_layout = [
                     html.Div([
                         html.H6("Current Dataset Information:", 
                                style={'color': '#34495e', 'fontWeight': '600'}),
-                        html.P(f"File: UTSA Client Dataset - Students of Service (SOS).xlsx", 
+                        html.P(f"File: {'No file loaded' if clients_raw.empty else 'Dataset loaded via upload'}", 
                               className='text-muted mb-1'),
-                        html.P(f"Total Clients: {len(clients_raw) if 'clients_raw' in globals() else 'N/A'}", 
+                        html.P(f"Total Clients: {len(clients_raw) if not clients_raw.empty else '0'}", 
                               className='text-muted mb-1'),
-                        html.P(f"Total Service Hours Records: {len(hours) if 'hours' in globals() else 'N/A'}", 
+                        html.P(f"Total Service Hours Records: {len(hours) if not hours.empty else '0'}", 
                               className='text-muted mb-1'),
-                        html.P(f"Last Updated: {dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 
+                        html.P(f"Status: {'Ready to upload data' if clients_raw.empty else 'Data loaded successfully'}", 
                               className='text-muted')
                     ], className="mt-4 p-3", 
                        style={'backgroundColor': '#e8f4f8', 'borderRadius': '5px'})
@@ -789,8 +803,30 @@ def switch_internal_subtab(active_subtab):
     Input('age-drop','value')
 )
 def pie_chart(age):
+    if clients.empty or 'Age at Sign Up' not in clients.columns:
+        # Return empty pie chart with message
+        fig = px.pie(values=[1], names=['No Data Available'])
+        fig.update_layout(
+            title="Upload data to view chart",
+            margin=dict(l=20, r=20, t=20, b=20),
+            font=dict(size=11),
+            height=320
+        )
+        return fig
+    
     age_chosen = int(age)
     age_df = clients[clients['Age at Sign Up']==age_chosen]
+    
+    if age_df.empty:
+        fig = px.pie(values=[1], names=['No Data for Selected Age'])
+        fig.update_layout(
+            title=f"No data available for age {age_chosen}",
+            margin=dict(l=20, r=20, t=20, b=20),
+            font=dict(size=11),
+            height=320
+        )
+        return fig
+    
     pie = px.pie(age_df, names='District')
     pie.update_layout(
         margin=dict(l=20, r=20, t=20, b=20),
@@ -812,8 +848,22 @@ def pie_chart(age):
     Input('popstat-drop', 'value')
 )
 def popstat_dashtable(popstat):
-    agg_stat, flat_stat = population_stat(clients, popstat)
-    return dbc.Table.from_dataframe(agg_stat.reset_index().sort_values(by=popstat))
+    if clients.empty or popstat not in clients.columns:
+        return html.Div([
+            html.P("No data available. Please upload a dataset first.", 
+                   className="text-muted text-center",
+                   style={'padding': '20px'})
+        ])
+    
+    try:
+        agg_stat, flat_stat = population_stat(clients, popstat)
+        return dbc.Table.from_dataframe(agg_stat.reset_index().sort_values(by=popstat))
+    except Exception as e:
+        return html.Div([
+            html.P(f"Error generating statistics: {str(e)}", 
+                   className="text-danger text-center",
+                   style={'padding': '20px'})
+        ])
 
 @callback(
     Output('map-display-area', 'children'),
@@ -943,6 +993,12 @@ def handle_file_upload(contents, filename):
             
             clients['Median Family Income'] = clients['Median Family Income'].astype('Int64')
             clients['Income Range (Thousands)'] = clients['Median Family Income'].apply(income_range)
+            
+            # Update school club data
+            global schoolclub_hours, club_low, club_high, noclub_low, noclub_high
+            schoolclub_hours = clients.groupby(by='School').agg({'Hours':'sum'}).reset_index()
+            schoolclub_hours['Club'] = np.where(schoolclub_hours['School'].isin(schools_with_clubs),1,0).astype(str)
+            club_low, club_high, noclub_low, noclub_high = get_club_ci()
             
             # Update quarter data
             hours['qtr-year'] = (
