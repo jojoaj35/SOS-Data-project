@@ -11,6 +11,8 @@ from threading import Timer
 import datetime as dt
 from scipy import stats as scipystat
 import math
+import base64
+import io
 
 # Import functions from the map modules
 from events_analysis import (
@@ -390,6 +392,8 @@ app.layout = dbc.Container([
         dbc.Tab(label="Dashboard", tab_id="dashboard", active_tab_style={"textTransform": "uppercase"}),
         # Secondary Tab  
         dbc.Tab(label="Internal", tab_id="internal", active_tab_style={"textTransform": "uppercase"}),
+        # File Uploader Tab
+        dbc.Tab(label="File Uploader", tab_id="file-uploader", active_tab_style={"textTransform": "uppercase"}),
     ], id="tabs", active_tab="dashboard", className="mb-3"),
     
     # Tab content
@@ -666,6 +670,89 @@ settings_subtab_layout = [
         ], className="d-flex flex-column align-items-center justify-content-center h-100")
     ])
 ]
+
+# File Uploader Tab Layout
+file_uploader_layout = [
+    dbc.Row([
+        dbc.Col([
+            dbc.Card([
+                dbc.CardHeader([
+                    html.H5("Upload New Dataset", 
+                           className="mb-0 text-center",
+                           style={'color': '#34495e', 'fontWeight': '600'})
+                ]),
+                dbc.CardBody([
+                    html.Div([
+                        dcc.Upload(
+                            id='upload-data',
+                            children=html.Div([
+                                html.I(className="fas fa-cloud-upload-alt fa-3x mb-3", 
+                                      style={'color': '#3498db'}),
+                                html.H4('Drag and Drop or Click to Select Files'),
+                                html.P('Supported formats: Excel (.xlsx, .xls)', 
+                                      className='text-muted'),
+                                html.P('Expected sheets: Clients, Service Hours, Survey Responses', 
+                                      className='text-muted text-sm')
+                            ], className="text-center"),
+                            style={
+                                'width': '100%',
+                                'height': '200px',
+                                'lineHeight': '200px',
+                                'borderWidth': '2px',
+                                'borderStyle': 'dashed',
+                                'borderRadius': '10px',
+                                'borderColor': '#3498db',
+                                'textAlign': 'center',
+                                'margin': '10px',
+                                'cursor': 'pointer',
+                                'backgroundColor': '#f8f9fa'
+                            },
+                            multiple=False
+                        )
+                    ], className="mb-3"),
+                    
+                    html.Div(id='upload-status', className="mt-3"),
+                    
+                    html.Div([
+                        html.H6("Current Dataset Information:", 
+                               style={'color': '#34495e', 'fontWeight': '600'}),
+                        html.P(f"File: UTSA Client Dataset - Students of Service (SOS).xlsx", 
+                              className='text-muted mb-1'),
+                        html.P(f"Total Clients: {len(clients_raw) if 'clients_raw' in globals() else 'N/A'}", 
+                              className='text-muted mb-1'),
+                        html.P(f"Total Service Hours Records: {len(hours) if 'hours' in globals() else 'N/A'}", 
+                              className='text-muted mb-1'),
+                        html.P(f"Last Updated: {dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 
+                              className='text-muted')
+                    ], className="mt-4 p-3", 
+                       style={'backgroundColor': '#e8f4f8', 'borderRadius': '5px'})
+                ])
+            ], className='shadow-sm')
+        ], width=8, className="mx-auto")
+    ], className="justify-content-center"),
+    
+    dbc.Row([
+        dbc.Col([
+            dbc.Card([
+                dbc.CardHeader([
+                    html.H6("File Upload Instructions", 
+                           className="mb-0 text-center",
+                           style={'color': '#34495e', 'fontWeight': '600'})
+                ]),
+                dbc.CardBody([
+                    html.Ul([
+                        html.Li("Upload Excel files (.xlsx or .xls format)"),
+                        html.Li("File must contain exactly 3 sheets: 'Clients', 'Service Hours', 'Survey Responses'"),
+                        html.Li("Clients sheet should contain Galaxy ID, Age, School, District, etc."),
+                        html.Li("Service Hours sheet should contain userId (will be renamed to Galaxy ID), Event Date, hours, etc."),
+                        html.Li("Survey Responses sheet should contain survey data"),
+                        html.Li("After successful upload, refresh the dashboard to see updated data")
+                    ], className="mb-0")
+                ])
+            ], className='shadow-sm')
+        ], width=8, className="mx-auto mt-3")
+    ], className="justify-content-center")
+]
     
 
 
@@ -679,6 +766,8 @@ def switch_tab(active_tab):
         return dashboard_layout
     elif active_tab == "internal":  
         return internal_layout
+    elif active_tab == "file-uploader":
+        return file_uploader_layout
     return dashboard_layout
 
 # Callback for internal sub-tab switching
@@ -764,6 +853,134 @@ def update_map_display(map_type):
             html.P("Please check data availability and try again", 
                    className="text-muted text-center")
         ])
+
+@callback(
+    Output('upload-status', 'children'),
+    Input('upload-data', 'contents'),
+    Input('upload-data', 'filename')
+)
+def handle_file_upload(contents, filename):
+    if contents is None:
+        return html.Div()
+    
+    try:
+        # Parse the uploaded file
+        content_type, content_string = contents.split(',')
+        decoded = base64.b64decode(content_string)
+        
+        if filename.endswith('.xlsx') or filename.endswith('.xls'):
+            # Read Excel file
+            excel_file = pd.ExcelFile(io.BytesIO(decoded))
+            
+            # Check if required sheets exist
+            required_sheets = ['Clients', 'Service Hours', 'Survey Responses']
+            missing_sheets = [sheet for sheet in required_sheets if sheet not in excel_file.sheet_names]
+            
+            if missing_sheets:
+                return dbc.Alert(
+                    f"Error: Missing required sheets: {', '.join(missing_sheets)}. "
+                    f"Found sheets: {', '.join(excel_file.sheet_names)}",
+                    color="danger",
+                    dismissable=True
+                )
+            
+            # Read the sheets
+            new_clients_raw = pd.read_excel(io.BytesIO(decoded), sheet_name='Clients')
+            new_hours = (pd.read_excel(io.BytesIO(decoded), sheet_name='Service Hours')
+                        .rename({'userId': 'Galaxy ID'}, axis=1))
+            new_survey_raw = pd.read_excel(io.BytesIO(decoded), sheet_name='Survey Responses')
+            
+            # Update global variables
+            global clients_raw, hours, survey_raw, clients
+            clients_raw = new_clients_raw
+            hours = new_hours
+            survey_raw = new_survey_raw
+            
+            # Reprocess the clients data with the new data
+            clients = (clients_raw[clients_raw['Galaxy ID'].notna()]
+                                  .replace({'HS Graduation Year': '0', 'Age Now': 'Unknown'}, None)
+                                  .replace({'Age at Sign Up' : {"Unknown":15, 0:15, 1:15, 4:15}})
+                                  .query('`Age at Sign Up` <= 20')
+                                  [clients_raw['dateAdded'] >= dt.datetime(2020, 1, 1)]
+            )
+            
+            # Apply all the data transformations
+            clients[yes_no_cols] = clients[yes_no_cols].replace({'Yes': 1, 'No': 0})
+            clients['Zip Code'] = pd.to_numeric(clients['Zip Code'].astype(str).str[:5])
+            
+            # Recalculate derived columns
+            hours_sum = hours.groupby('Galaxy ID')['hours'].sum()
+            clients['Collected Hours'] = clients['Galaxy ID'].map(hours_sum)
+            
+            earliest_service = hours.groupby('Galaxy ID')['Event Date'].min()
+            clients['Earliest Service'] = clients['Galaxy ID'].map(earliest_service)
+            
+            latest_service = hours.groupby('Galaxy ID')['Event Date'].max()
+            clients['Latest Service'] = clients['Galaxy ID'].map(latest_service)
+            
+            service_count = hours.groupby('Galaxy ID')['Event Date'].count()
+            clients['Service Count'] = clients['Galaxy ID'].map(service_count)
+            
+            range_mask = (clients['Latest Service'] - clients['Earliest Service']).dt.days > 0
+            clients.loc[range_mask, 'Service Range'] = clients['Latest Service'] - clients['Earliest Service']
+            
+            clients['Follow Through'] = np.where(clients['Hours']>0, 1, 0).astype(int)
+            clients['Club'] = np.where(clients['School'].isin(schools_with_clubs),1,0).astype(int)
+            clients['County'] = clients['Zip Code'].apply(county_assign)
+            
+            # Reassign incomes
+            for id in clients['Galaxy ID'].values:
+                zip_of_id = clients.loc[clients['Galaxy ID']==id, 'Zip Code'].values[0]
+                county_of_id = clients.loc[clients['Galaxy ID']==id, 'County'].values[0]
+                
+                if zip_of_id in zip_incomes.values:
+                    clients.loc[clients['Galaxy ID']==id, 'Median Family Income'] = assign_zipincome(zip_of_id)
+                else:
+                    if county_of_id in county_zips.keys():
+                        clients.loc[clients['Galaxy ID']==id, 'Median Family Income'] = assign_countyincome(county_of_id)
+                    else:
+                        clients.loc[clients['Galaxy ID']==id, 'Median Family Income'] = None
+            
+            clients['Median Family Income'] = clients['Median Family Income'].astype('Int64')
+            clients['Income Range (Thousands)'] = clients['Median Family Income'].apply(income_range)
+            
+            # Update quarter data
+            hours['qtr-year'] = (
+                hours['Event Date'].dt.year.astype(str) +
+                '-Q' + hours['Event Date'].dt.quarter.astype(str)
+            )
+            
+            global qtr_vol_counts
+            qtr_vol_counts = pd.DataFrame(
+                list(hours.groupby('qtr-year')['Galaxy ID'].nunique().to_dict().items()), 
+                columns=['QTR', 'Active Volunteers']
+            )
+            
+            return dbc.Alert(
+                [
+                    html.I(className="fas fa-check-circle me-2"),
+                    f"Successfully uploaded {filename}! "
+                    f"Loaded {len(clients_raw)} clients, {len(hours)} service hours records, "
+                    f"and {len(survey_raw)} survey responses. "
+                    "Switch to the Dashboard tab to see the updated data."
+                ],
+                color="success",
+                dismissable=True
+            )
+            
+        else:
+            return dbc.Alert(
+                "Error: Please upload an Excel file (.xlsx or .xls)",
+                color="danger",
+                dismissable=True
+            )
+            
+    except Exception as e:
+        return dbc.Alert(
+            f"Error processing file: {str(e)}",
+            color="danger",
+            dismissable=True
+        )
 
 if __name__ == '__main__':
     Timer(1, lambda: webbrowser.open("http://localhost:8000")).start()
