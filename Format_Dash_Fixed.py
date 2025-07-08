@@ -27,7 +27,8 @@ from dashboard_components import (
     create_club_comparison_chart,
     create_quarter_volunteers_chart,
     calculate_hours_value,
-    get_age_dropdown_options
+    get_age_dropdown_options,
+    create_district_heat_map
 )
 
 from data_processing import (
@@ -259,7 +260,8 @@ dashboard_layout = [
                             id='map-type-dropdown',
                             options=[
                                 {'label': 'Client Distribution', 'value': 'clients'},
-                                {'label': 'Service Events', 'value': 'events'}
+                                {'label': 'Service Events', 'value': 'events'},
+                                {'label': 'District Heat Map', 'value': 'district_heat'}
                             ],
                             value='clients',
                             style={'marginBottom': '15px'}
@@ -638,6 +640,18 @@ def update_map_display(map_type, data_store):
                              className="text-muted text-center",
                              style={'padding': '50px'})
             fig = create_service_events_heatmap(hours, height=750)
+            return dcc.Graph(
+                figure=fig, 
+                style={'height': '750px', 'width': '100%'},
+                config={'responsive': True, 'displayModeBar': False}
+            )
+        
+        elif map_type == 'district_heat':
+            if clients.empty:
+                return html.P("Upload data to view district heat map", 
+                             className="text-muted text-center",
+                             style={'padding': '50px'})
+            fig = create_district_heat_map(clients)
             return dcc.Graph(
                 figure=fig, 
                 style={'height': '750px', 'width': '100%'},

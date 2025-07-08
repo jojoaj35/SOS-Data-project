@@ -5,6 +5,8 @@ from dash import html, dcc
 import statistics as stat
 from scipy import stats as scipystat
 import math
+import geopandas as gpd
+import json
 
 def create_empty_pie_chart():
     """Create empty pie chart for when no data is available"""
@@ -50,6 +52,134 @@ def create_district_pie_chart(clients, age):
         height=320
     )
     return fig
+
+def create_district_heat_map(clients):
+    """Create district heat map using school district boundaries"""
+    if clients.empty or 'District' not in clients.columns:
+        # Create empty map
+        fig = px.scatter_mapbox(
+            lat=[29.4241], lon=[-98.4936],
+            zoom=9,
+            mapbox_style="open-street-map",
+            title="Upload data to view District Heat Map",
+            height=750
+        )
+        fig.update_layout(
+            title={'text': "Upload data to view District Heat Map", 'x': 0.5, 'xanchor': 'center'},
+            height=750,
+            margin=dict(l=0, r=0, t=50, b=0)
+        )
+        return fig
+    
+    try:
+        # Get district counts from current data
+        district_counts = clients['District'].value_counts().reset_index()
+        district_counts.columns = ['District_Name', 'Client_Count']
+        
+        # Try to read the district shapes file
+        try:
+            district_shapes = gpd.read_file('School_Districts_2025_.geojson')
+        except FileNotFoundError:
+            # If the geojson file doesn't exist, create a fallback visualization
+            fig = px.bar(district_counts.head(10), 
+                        x='District_Name', y='Client_Count',
+                        title="District Client Distribution (GeoJSON file not found)")
+            fig.update_layout(
+                title={'text': "District Client Distribution", 'x': 0.5, 'xanchor': 'center'},
+                height=750,
+                margin=dict(l=20, r=20, t=50, b=20),
+                xaxis_title="School District",
+                yaxis_title="Number of Clients"
+            )
+            fig.update_xaxes(tickangle=45)
+            return fig
+
+        # District mapping for proper matching
+        district_mapping = {
+            'NISD': 'Northside ISD (Bexar)',
+            'NEISD': 'North East ISD',
+            'SAISD': 'San Antonio ISD',
+            'South San ISD': 'South San Antonio ISD',
+            'Judson ISD': 'Judson ISD',
+            'Edgewood ISD': 'Edgewood ISD (Bexar)',
+            'SCUC ISD': 'Schertz-Cibolo-Universal City ISD',
+            'East Central ISD': 'East Central ISD',
+            'Southwest ISD': 'Southwest ISD',
+            'Boerne ISD': 'Boerne ISD',
+            'Ft Sam Houston ISD': 'Fort Sam Houston ISD',
+            'SWISD': 'Southwest ISD'
+        }
+
+        district_counts['Mapped_District_Name'] = district_counts['District_Name'].map(district_mapping).fillna(district_counts['District_Name'])
+
+        # Merge data
+        merged = district_shapes.merge(district_counts, left_on='NAME', right_on='Mapped_District_Name', how='left')
+        merged['Client_Count'] = merged['Client_Count'].fillna(0).astype(int)
+        merged = merged.to_crs('EPSG:4326')
+
+        # Create color bins
+        max_val = merged['Client_Count'].max()
+        color_bins = [0, 1, 5, 10, 20, 50, 100, 200, 400, 700, max_val]
+        color_bins = sorted(list(set([b for b in color_bins if b <= max_val] + [max_val])))
+
+        def assign_color_category(value):
+            if value == 0:
+                return 0
+            for i, bin_val in enumerate(color_bins[1:], 1):
+                if value <= bin_val:
+                    return i
+            return len(color_bins) - 1
+
+        merged['Color_Category'] = merged['Client_Count'].apply(assign_color_category)
+
+        # Create map
+        geojson = json.loads(merged.to_json())
+        fig = px.choropleth_mapbox(
+            merged,
+            geojson=geojson,
+            locations=merged.index,
+            color='Color_Category',
+            color_continuous_scale=['#f7f7f7', '#deebf7', '#c6dbef', '#9ecae1', '#6baed6', '#4292c6', '#2171b5', '#08519c', '#08306b', '#05196e', '#021942'],
+            range_color=(0, len(color_bins) - 1),
+            mapbox_style="open-street-map",
+            zoom=9,
+            center={"lat": 29.4241, "lon": -98.4936},
+            opacity=0.8,
+            hover_name='NAME',
+            title="San Antonio School District Client Distribution"
+        )
+
+        fig.update_traces(
+            hovertemplate="<b>%{hovertext}</b><br>Clients: %{customdata}<extra></extra>",
+            hovertext=merged['NAME'],
+            customdata=merged['Client_Count']
+        )
+
+        fig.update_layout(
+            title={'text': "San Antonio School District Client Distribution", 'x': 0.5, 'xanchor': 'center'},
+            height=750,
+            margin=dict(l=0, r=0, t=50, b=0)
+        )
+
+        return fig
+    
+    except Exception as e:
+        # Fallback to bar chart if there are any issues
+        district_counts = clients['District'].value_counts().reset_index()
+        district_counts.columns = ['District_Name', 'Client_Count']
+        
+        fig = px.bar(district_counts.head(10), 
+                    x='District_Name', y='Client_Count',
+                    title=f"District Client Distribution (Error: {str(e)})")
+        fig.update_layout(
+            title={'text': "District Client Distribution", 'x': 0.5, 'xanchor': 'center'},
+            height=750,
+            margin=dict(l=20, r=20, t=50, b=20),
+            xaxis_title="School District",
+            yaxis_title="Number of Clients"
+        )
+        fig.update_xaxes(tickangle=45)
+        return fig
 
 def calculate_club_confidence_intervals(schoolclub_hours):
     """Calculate confidence intervals for club vs no club comparison"""
