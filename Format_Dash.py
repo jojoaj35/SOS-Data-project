@@ -12,9 +12,17 @@ import datetime as dt
 from scipy import stats as scipystat
 import math
 
+# Import functions from the map modules
+from events_analysis import (
+    create_service_events_heatmap, 
+    create_virtual_vs_located_chart,
+    create_events_timeline,
+    get_events_summary_stats
+)
+from heatmap import create_heatmap_from_dataframe
 
 #Load dataset
-file_path = 'C:/Users/cln87/UTSA Files/CIS/SOS_Data/UTSA Client Dataset - Students of Service (SOS).xlsx'
+file_path = '/Users/joelwilson/Desktop/sos data project 3/UTSA Client Dataset - Students of Service (SOS).xlsx'
 
 clients_raw = pd.read_excel(file_path, sheet_name='Clients')  #Convert dates to datetime objects
 
@@ -389,7 +397,13 @@ app.layout = dbc.Container([
     # Tab content
     html.Div(id="tab-content")
     
-], fluid=True, style={'height': '100vh', 'padding': '15px', 'backgroundColor': '#f8f9fa'})
+], fluid=True, style={
+    'minHeight': '100vh', 
+    'padding': '15px', 
+    'backgroundColor': '#f8f9fa',
+    'overflowY': 'auto',
+    'overflowX': 'hidden'
+})
 
 # Main Dashboard Layout (Original layout with heatmap placeholder)
 dashboard_layout = [
@@ -518,17 +532,33 @@ dashboard_layout = [
                            style={'color': '#34495e', 'fontWeight': '600'})
                 ]),
                 dbc.CardBody([
+                    # Map type selector
                     html.Div([
-                        html.I(className="fas fa-map-marked-alt fa-3x mb-3", 
-                              style={'color': '#3498db'}),
-                        html.P("Interactive map visualization will be displayed here", 
-                              className="text-muted mb-0",
-                              style={'fontSize': '16px'})
-                    ], className="d-flex flex-column align-items-center justify-content-center h-100")
-                ])
+                        html.Label("Select Map Type:", 
+                                 className="form-label mb-2",
+                                 style={'fontWeight': '500', 'fontSize': '14px'}),
+                        dcc.Dropdown(
+                            id='map-type-dropdown',
+                            options=[
+                                {'label': 'Client Distribution', 'value': 'clients'},
+                                {'label': 'Service Events', 'value': 'events'},
+                                {'label': 'Virtual vs Located', 'value': 'virtual'},
+                                {'label': 'Events Timeline', 'value': 'timeline'}
+                            ],
+                            value='clients',
+                            style={'marginBottom': '15px'}
+                        )
+                    ]),
+                    # Map display area
+                    html.Div(id='map-display-area', style={
+                        'height': '750px', 
+                        'width': '100%',
+                        'overflow': 'visible'
+                    })
+                ], style={'padding': '15px', 'overflow': 'visible'})
             ],
             className='shadow-sm',
-            style={'height': '300px'}
+            style={'height': '850px', 'marginBottom': '50px'}
             )
         ], width=8)
     ])
@@ -679,6 +709,72 @@ def pie_chart(age):
 def popstat_dashtable(popstat):
     agg_stat, flat_stat = population_stat(clients, popstat)
     return dbc.Table.from_dataframe(agg_stat.reset_index().sort_values(by=popstat))
+
+@callback(
+    Output('map-display-area', 'children'),
+    Input('map-type-dropdown', 'value')
+)
+def update_map_display(map_type):
+    try:
+        if map_type == 'clients':
+            # Client distribution heatmap
+            fig = create_heatmap_from_dataframe(clients, height=750)
+            return dcc.Graph(
+                figure=fig, 
+                style={'height': '750px', 'width': '100%'},
+                config={'responsive': True, 'displayModeBar': False}
+            )
+        
+        elif map_type == 'events':
+            # Service events heatmap
+            fig = create_service_events_heatmap(hours, height=750)
+            return dcc.Graph(
+                figure=fig, 
+                style={'height': '750px', 'width': '100%'},
+                config={'responsive': True, 'displayModeBar': False}
+            )
+        
+        elif map_type == 'virtual':
+            # Virtual vs located events pie chart
+            fig = create_virtual_vs_located_chart(hours)
+            fig.update_layout(
+                height=750, 
+                margin=dict(l=20, r=20, t=60, b=20),
+                autosize=True
+            )
+            return dcc.Graph(
+                figure=fig, 
+                style={'height': '750px', 'width': '100%'},
+                config={'responsive': True, 'displayModeBar': False}
+            )
+        
+        elif map_type == 'timeline':
+            # Events timeline
+            fig = create_events_timeline(hours)
+            fig.update_layout(
+                height=750, 
+                margin=dict(l=50, r=20, t=60, b=50),
+                autosize=True
+            )
+            return dcc.Graph(
+                figure=fig, 
+                style={'height': '750px', 'width': '100%'},
+                config={'responsive': True, 'displayModeBar': False}
+            )
+        
+        else:
+            return html.P("Select a map type to view visualization", 
+                         className="text-muted text-center",
+                         style={'padding': '50px'})
+    
+    except Exception as e:
+        return html.Div([
+            html.P(f"Error loading map: {str(e)}", 
+                   className="text-danger text-center",
+                   style={'padding': '20px'}),
+            html.P("Please check data availability and try again", 
+                   className="text-muted text-center")
+        ])
 
 if __name__ == '__main__':
     Timer(1, lambda: webbrowser.open("http://localhost:8000")).start()
