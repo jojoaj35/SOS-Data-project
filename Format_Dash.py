@@ -15,8 +15,6 @@ import math
 # Import functions from the map modules
 from events_analysis import (
     create_service_events_heatmap, 
-    create_virtual_vs_located_chart,
-    create_events_timeline,
     get_events_summary_stats
 )
 from heatmap import create_heatmap_from_dataframe
@@ -541,9 +539,7 @@ dashboard_layout = [
                             id='map-type-dropdown',
                             options=[
                                 {'label': 'Client Distribution', 'value': 'clients'},
-                                {'label': 'Service Events', 'value': 'events'},
-                                {'label': 'Virtual vs Located', 'value': 'virtual'},
-                                {'label': 'Events Timeline', 'value': 'timeline'}
+                                {'label': 'Service Events', 'value': 'events'}
                             ],
                             value='clients',
                             style={'marginBottom': '15px'}
@@ -734,33 +730,6 @@ def update_map_display(map_type):
                 config={'responsive': True, 'displayModeBar': False}
             )
         
-        elif map_type == 'virtual':
-            # Virtual vs located events pie chart
-            fig = create_virtual_vs_located_chart(hours)
-            fig.update_layout(
-                height=750, 
-                margin=dict(l=20, r=20, t=60, b=20),
-                autosize=True
-            )
-            return dcc.Graph(
-                figure=fig, 
-                style={'height': '750px', 'width': '100%'},
-                config={'responsive': True, 'displayModeBar': False}
-            )
-        
-        elif map_type == 'timeline':
-            # Events timeline
-            fig = create_events_timeline(hours)
-            fig.update_layout(
-                height=750, 
-                margin=dict(l=50, r=20, t=60, b=50),
-                autosize=True
-            )
-            return dcc.Graph(
-                figure=fig, 
-                style={'height': '750px', 'width': '100%'},
-                config={'responsive': True, 'displayModeBar': False}
-            )
         
         else:
             return html.P("Select a map type to view visualization", 

@@ -15,7 +15,7 @@ def create_heatmap_from_dataframe(clients_df, height=600):
         clients_data['Zip Code'] = clients_data['Zip Code'].astype(str)
         
         # Load ZIP shapes
-        zip_shapes = gpd.read_file(r"/Users/joelwilson/Downloads/tl_2024_us_zcta520")
+        zip_shapes = gpd.read_file("texas_zcta_2024_simplified.geojson")
         
         # Count clients per ZIP code
         zip_counts = clients_data['Zip Code'].value_counts().reset_index()

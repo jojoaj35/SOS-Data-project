@@ -46,7 +46,7 @@ def create_service_events_heatmap(hours_df, height=450):
         
         # Load ZIP shapes
         try:
-            zip_shapes = gpd.read_file(r"/Users/joelwilson/Downloads/tl_2024_us_zcta520")
+            zip_shapes = gpd.read_file("texas_zcta_2024_simplified.geojson")
         except:
             # If ZIP shapes not available, create a simple bar chart
             fig = px.bar(event_counts.head(20), 
@@ -161,92 +161,6 @@ def create_service_events_heatmap(hours_df, height=450):
         )
         return fig
 
-def create_virtual_vs_located_chart(hours_df):
-    """Create a pie chart showing virtual vs located events"""
-    virtual_count = get_virtual_events_count(hours_df)
-    located_count = get_located_events_count(hours_df)
-    
-    fig = px.pie(
-        values=[virtual_count, located_count],
-        names=['Virtual/Other Events', 'Located Events'],
-        title='Service Events: Virtual vs Located',
-        color_discrete_map={
-            'Virtual/Other Events': '#dc3545',  # Red
-            'Located Events': '#28a745'         # Green
-        }
-    )
-    
-    fig.update_traces(textposition='inside', textinfo='percent+label')
-    fig.update_layout(
-        font=dict(family="Arial, sans-serif", size=12, color="#2c3e50"),
-        title={'x': 0.5, 'xanchor': 'center'},
-        height=400
-    )
-    
-    return fig
-
-def create_events_timeline(hours_df):
-    """Create a timeline showing events over time"""
-    try:
-        # Prepare data
-        hours_df['Event Date'] = pd.to_datetime(hours_df['Event Date'])
-        hours_df['Year_Month'] = hours_df['Event Date'].dt.to_period('M')
-        
-        # Count events by month and type
-        timeline_data = []
-        for period in hours_df['Year_Month'].unique():
-            if pd.isna(period):
-                continue
-            period_data = hours_df[hours_df['Year_Month'] == period]
-            virtual = get_virtual_events_count(period_data)
-            located = get_located_events_count(period_data)
-            
-            timeline_data.append({
-                'Period': str(period),
-                'Virtual Events': virtual,
-                'Located Events': located,
-                'Total Events': virtual + located
-            })
-        
-        timeline_df = pd.DataFrame(timeline_data)
-        timeline_df = timeline_df.sort_values('Period')
-        
-        # Create line chart
-        fig = go.Figure()
-        
-        fig.add_trace(go.Scatter(
-            x=timeline_df['Period'],
-            y=timeline_df['Virtual Events'],
-            mode='lines+markers',
-            name='Virtual Events',
-            line=dict(color='#dc3545', width=3),
-            marker=dict(size=6)
-        ))
-        
-        fig.add_trace(go.Scatter(
-            x=timeline_df['Period'],
-            y=timeline_df['Located Events'],
-            mode='lines+markers',
-            name='Located Events',
-            line=dict(color='#28a745', width=3),
-            marker=dict(size=6)
-        ))
-        
-        fig.update_layout(
-            title='Service Events Timeline: Virtual vs Located',
-            xaxis_title='Time Period',
-            yaxis_title='Number of Events',
-            font=dict(family="Arial, sans-serif", size=12, color="#2c3e50"),
-            title_x=0.5,
-            height=400,
-            hovermode='x unified'
-        )
-        
-        return fig
-        
-    except Exception as e:
-        print(f"Error creating timeline: {e}")
-        return px.scatter(title="Timeline - Error loading data")
 
 def get_events_summary_stats(hours_df):
     """Get comprehensive summary statistics for events"""
