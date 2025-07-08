@@ -46,7 +46,7 @@ def create_service_events_heatmap(hours_df, height=450):
         
         # Load ZIP shapes
         try:
-            zip_shapes = gpd.read_file(r"/Users/joelwilson/Downloads/tl_2024_us_zcta520")
+            zip_shapes = gpd.read_file("texas_zcta_2024_simplified.geojson")
         except:
             # If ZIP shapes not available, create a simple bar chart
             fig = px.bar(event_counts.head(20), 
