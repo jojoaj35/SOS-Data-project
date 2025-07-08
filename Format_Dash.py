@@ -579,7 +579,7 @@ analytics_subtab_layout = [
         dbc.Col([
             dbc.Card([
                 dbc.CardHeader([
-                    html.H5("Advanced Analytics Dashboard", 
+                    html.H5("Analytics Column 1", 
                            className="mb-0 text-center",
                            style={'color': '#34495e', 'fontWeight': '600'})
                 ]),
@@ -587,14 +587,34 @@ analytics_subtab_layout = [
                     html.Div([
                         html.I(className="fas fa-chart-line fa-4x mb-3", 
                               style={'color': '#e74c3c'}),
-                        html.H4("Coming Soon", className="mb-2"),
-                        html.P("Advanced analytics and reporting features will be available here", 
+                        html.H4("Column 1 Content", className="mb-2"),
+                        html.P("Add your analytics content here", 
                               className="text-muted",
                               style={'fontSize': '18px'})
                     ], className="d-flex flex-column align-items-center justify-content-center h-100")
                 ])
             ], className='shadow-sm', style={'height': '400px'})
-        ], width=12, className="mb-3")
+        ], width=6, className="mb-3"),
+        
+        dbc.Col([
+            dbc.Card([
+                dbc.CardHeader([
+                    html.H5("Analytics Column 2", 
+                           className="mb-0 text-center",
+                           style={'color': '#34495e', 'fontWeight': '600'})
+                ]),
+                dbc.CardBody([
+                    html.Div([
+                        html.I(className="fas fa-chart-bar fa-4x mb-3", 
+                              style={'color': '#3498db'}),
+                        html.H4("Column 2 Content", className="mb-2"),
+                        html.P("Add your analytics content here", 
+                              className="text-muted",
+                              style={'fontSize': '18px'})
+                    ], className="d-flex flex-column align-items-center justify-content-center h-100")
+                ])
+            ], className='shadow-sm', style={'height': '400px'})
+        ], width=6, className="mb-3")
     ]),
 ]
 
