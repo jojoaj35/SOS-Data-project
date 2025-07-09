@@ -7,6 +7,7 @@ from scipy import stats as scipystat
 import math
 import geopandas as gpd
 import json
+import numpy as np
 
 def create_empty_pie_chart():
     """Create empty pie chart for when no data is available"""
@@ -54,7 +55,7 @@ def create_district_pie_chart(clients, age):
     return fig
 
 def create_district_heat_map(clients):
-    """Create district heat map using school district boundaries"""
+    """Create district heat map using actual client count data for color mapping"""
     if clients.empty or 'District' not in clients.columns:
         # Create empty map
         fig = px.scatter_mapbox(
@@ -117,30 +118,23 @@ def create_district_heat_map(clients):
         merged['Client_Count'] = merged['Client_Count'].fillna(0).astype(int)
         merged = merged.to_crs('EPSG:4326')
 
-        # Create color bins
-        max_val = merged['Client_Count'].max()
-        color_bins = [0, 1, 5, 10, 20, 50, 100, 200, 400, 700, max_val]
-        color_bins = sorted(list(set([b for b in color_bins if b <= max_val] + [max_val])))
+        # Use actual client count data directly for color mapping
+        min_clients = merged['Client_Count'].min()
+        max_clients = merged['Client_Count'].max()
+        
+        # If all values are the same, add small range to prevent color scaling issues
+        if max_clients == min_clients:
+            max_clients = min_clients + 1
 
-        def assign_color_category(value):
-            if value == 0:
-                return 0
-            for i, bin_val in enumerate(color_bins[1:], 1):
-                if value <= bin_val:
-                    return i
-            return len(color_bins) - 1
-
-        merged['Color_Category'] = merged['Client_Count'].apply(assign_color_category)
-
-        # Create map
+        # Create map using actual client count data for colors
         geojson = json.loads(merged.to_json())
         fig = px.choropleth_mapbox(
             merged,
             geojson=geojson,
             locations=merged.index,
-            color='Color_Category',
+            color='Client_Count',  # Use actual client count data directly
             color_continuous_scale=['#f7f7f7', '#deebf7', '#c6dbef', '#9ecae1', '#6baed6', '#4292c6', '#2171b5', '#08519c', '#08306b', '#05196e', '#021942'],
-            range_color=(0, len(color_bins) - 1),
+            range_color=[min_clients, max_clients],  # Set range based on actual data
             mapbox_style="open-street-map",
             zoom=9,
             center={"lat": 29.4241, "lon": -98.4936},
@@ -150,15 +144,80 @@ def create_district_heat_map(clients):
         )
 
         fig.update_traces(
-            hovertemplate="<b>%{hovertext}</b><br>Clients: %{customdata}<extra></extra>",
-            hovertext=merged['NAME'],
-            customdata=merged['Client_Count']
+            hovertemplate="<b>%{hovertext}</b><br>Clients: %{z}<extra></extra>",
+            hovertext=merged['NAME']
         )
 
+        # Create clean, simple tick values for the colorbar
+        data_range = max_clients - min_clients
+        
+        # Always include min and max values, plus 3-5 intermediate values
+        if data_range <= 5:
+            # Small range: show every value
+            tick_values = list(range(min_clients, max_clients + 1))
+        elif data_range <= 20:
+            # Small-medium range: show every few values
+            step = max(1, data_range // 4)
+            tick_values = list(range(min_clients, max_clients + 1, step))
+            if max_clients not in tick_values:
+                tick_values.append(max_clients)
+        elif data_range <= 100:
+            # Medium range: show nice round numbers
+            step = 10 if data_range <= 50 else 20
+            tick_values = []
+            current = min_clients
+            while current <= max_clients:
+                tick_values.append(current)
+                current += step
+            if max_clients not in tick_values:
+                tick_values.append(max_clients)
+        else:
+            # Large range: show major intervals
+            if data_range <= 500:
+                step = 50
+            elif data_range <= 1000:
+                step = 100
+            else:
+                step = 200
+            
+            tick_values = []
+            current = min_clients
+            while current <= max_clients:
+                tick_values.append(current)
+                current += step
+            if max_clients not in tick_values:
+                tick_values.append(max_clients)
+        
+        # Ensure values are sorted and clean
+        tick_values = sorted(list(set(tick_values)))
+
+        # Update layout with colorbar showing actual data values and enable zoom controls
         fig.update_layout(
             title={'text': "San Antonio School District Client Distribution", 'x': 0.5, 'xanchor': 'center'},
             height=750,
-            margin=dict(l=0, r=0, t=50, b=0)
+            margin=dict(l=0, r=0, t=50, b=0),
+            coloraxis_colorbar=dict(
+                title="Number of Clients",
+                tickmode="array",
+                tickvals=tick_values,
+                ticktext=[str(val) for val in tick_values],
+                len=0.7,
+                thickness=25,
+                title_font_size=14,
+                tickfont_size=12
+            ),
+            mapbox=dict(
+                style="open-street-map",
+                zoom=9,
+                center={"lat": 29.4241, "lon": -98.4936}
+            )
+        )
+        
+        # Ensure zoom controls are enabled
+        fig.update_mapboxes(
+            style="open-street-map",
+            zoom=9,
+            center={"lat": 29.4241, "lon": -98.4936}
         )
 
         return fig

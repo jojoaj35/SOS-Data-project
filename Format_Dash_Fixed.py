@@ -281,10 +281,15 @@ dashboard_layout = [
 # Internal tab layout
 internal_layout = [
     dbc.Tabs([
+        dbc.Tab(label="Population Statistics", tab_id="population-stats", active_tab_style={"textTransform": "uppercase"}),
+        dbc.Tab(label="Frequency Tables", tab_id="frequency-tables", active_tab_style={"textTransform": "uppercase"}),
+        dbc.Tab(label="Pie Chart", tab_id="pie-chart", active_tab_style={"textTransform": "uppercase"}),
+        dbc.Tab(label="Chi-Square", tab_id="chi-square", active_tab_style={"textTransform": "uppercase"}),
+        dbc.Tab(label="Funnel", tab_id="funnel", active_tab_style={"textTransform": "uppercase"}),
         dbc.Tab(label="Settings", tab_id="settings-sub", active_tab_style={"textTransform": "uppercase"}),
         dbc.Tab(label="Analytics", tab_id="analytics-sub", active_tab_style={"textTransform": "uppercase"}),
         dbc.Tab(label="Reports", tab_id="reports-sub", active_tab_style={"textTransform": "uppercase"}),
-    ], id="internal-subtabs", active_tab="settings-sub", className="mb-3"),
+    ], id="internal-subtabs", active_tab="population-stats", className="mb-3"),
     html.Div(id="internal-subtab-content")
 ]
 
@@ -358,7 +363,8 @@ reports_subtab_layout = [
     ])
 ]
 
-settings_subtab_layout = [
+# Population Statistics layout
+population_stats_layout = [
     dbc.Row([
         dbc.Col([
             dbc.Card([
@@ -367,17 +373,227 @@ settings_subtab_layout = [
                             className="mb-0 text-center",
                             style={'color': '#34495e', 'fontWeight': '600'})
                 ]),
-                dcc.Dropdown(
-                    id='popstat-drop',
-                    options=[{'label': col, 'value': col} for col in ['Zip Code', 'Age at Sign Up', 'Age Now',
-                        'School', 'District', 'Race/Ethnicity', 'Gender', 'Income Range (Thousands)']],
-                    value='District',
-                ),
-                dbc.CardBody(
-                    html.Div(id='popstat-table-container')
-                )
+                dbc.CardBody([
+                    html.Div([
+                        html.Label("Select Variable:", 
+                                 className="form-label mb-2",
+                                 style={'fontWeight': '500', 'fontSize': '14px'}),
+                        dcc.Dropdown(
+                            id='popstat-drop',
+                            options=[{'label': col, 'value': col} for col in ['Zip Code', 'Age at Sign Up', 'Age Now',
+                                'School', 'District', 'Race/Ethnicity', 'Gender', 'Income Range (Thousands)']],
+                            value='District',
+                            style={'marginBottom': '15px'}
+                        )
+                    ]),
+                    html.Div(id='popstat-table-container', style={'height': '500px', 'overflowY': 'auto'})
+                ])
+            ], className='shadow-sm', style={'height': '600px'})
+        ], width=12)
+    ])
+]
+
+# Frequency Tables layout
+frequency_tables_layout = [
+    dbc.Row([
+        dbc.Col([
+            dbc.Card([
+                dbc.CardHeader([
+                    html.H5("Frequency Tables", 
+                           className="mb-0 text-center",
+                           style={'color': '#34495e', 'fontWeight': '600'})
+                ]),
+                dbc.CardBody([
+                    html.Div([
+                        html.I(className="fas fa-table fa-4x mb-3", 
+                              style={'color': '#9b59b6'}),
+                        html.H4("Frequency Analysis", className="mb-2"),
+                        html.P("Frequency distribution tables and cross-tabulations", 
+                              className="text-muted",
+                              style={'fontSize': '18px'})
+                    ], className="d-flex flex-column align-items-center justify-content-center h-100")
+                ])
             ], className='shadow-sm', style={'height': '400px'})
-        ], className="d-flex flex-column align-items-center justify-content-center h-100")
+        ], width=6),
+        
+        dbc.Col([
+            dbc.Card([
+                dbc.CardHeader([
+                    html.H5("Variable Selection", 
+                           className="mb-0 text-center",
+                           style={'color': '#34495e', 'fontWeight': '600'})
+                ]),
+                dbc.CardBody([
+                    html.Div([
+                        html.I(className="fas fa-cogs fa-4x mb-3", 
+                              style={'color': '#e67e22'}),
+                        html.H4("Configure Tables", className="mb-2"),
+                        html.P("Select variables for frequency analysis", 
+                              className="text-muted",
+                              style={'fontSize': '18px'})
+                    ], className="d-flex flex-column align-items-center justify-content-center h-100")
+                ])
+            ], className='shadow-sm', style={'height': '400px'})
+        ], width=6)
+    ])
+]
+
+# Pie Chart layout
+pie_chart_layout = [
+    dbc.Row([
+        dbc.Col([
+            dbc.Card([
+                dbc.CardHeader([
+                    html.H5("Pie Chart Visualization", 
+                           className="mb-0 text-center",
+                           style={'color': '#34495e', 'fontWeight': '600'})
+                ]),
+                dbc.CardBody([
+                    html.Div([
+                        html.I(className="fas fa-chart-pie fa-4x mb-3", 
+                              style={'color': '#e74c3c'}),
+                        html.H4("Interactive Pie Charts", className="mb-2"),
+                        html.P("Visualize categorical data distributions", 
+                              className="text-muted",
+                              style={'fontSize': '18px'})
+                    ], className="d-flex flex-column align-items-center justify-content-center h-100")
+                ])
+            ], className='shadow-sm', style={'height': '400px'})
+        ], width=6),
+        
+        dbc.Col([
+            dbc.Card([
+                dbc.CardHeader([
+                    html.H5("Chart Controls", 
+                           className="mb-0 text-center",
+                           style={'color': '#34495e', 'fontWeight': '600'})
+                ]),
+                dbc.CardBody([
+                    html.Div([
+                        html.I(className="fas fa-sliders-h fa-4x mb-3", 
+                              style={'color': '#3498db'}),
+                        html.H4("Customize Views", className="mb-2"),
+                        html.P("Select variables and customize pie chart display", 
+                              className="text-muted",
+                              style={'fontSize': '18px'})
+                    ], className="d-flex flex-column align-items-center justify-content-center h-100")
+                ])
+            ], className='shadow-sm', style={'height': '400px'})
+        ], width=6)
+    ])
+]
+
+# Chi-Square layout
+chi_square_layout = [
+    dbc.Row([
+        dbc.Col([
+            dbc.Card([
+                dbc.CardHeader([
+                    html.H5("Chi-Square Tests", 
+                           className="mb-0 text-center",
+                           style={'color': '#34495e', 'fontWeight': '600'})
+                ]),
+                dbc.CardBody([
+                    html.Div([
+                        html.I(className="fas fa-calculator fa-4x mb-3", 
+                              style={'color': '#f39c12'}),
+                        html.H4("Statistical Analysis", className="mb-2"),
+                        html.P("Chi-square tests for independence and goodness of fit", 
+                              className="text-muted",
+                              style={'fontSize': '18px'})
+                    ], className="d-flex flex-column align-items-center justify-content-center h-100")
+                ])
+            ], className='shadow-sm', style={'height': '400px'})
+        ], width=6),
+        
+        dbc.Col([
+            dbc.Card([
+                dbc.CardHeader([
+                    html.H5("Test Results", 
+                           className="mb-0 text-center",
+                           style={'color': '#34495e', 'fontWeight': '600'})
+                ]),
+                dbc.CardBody([
+                    html.Div([
+                        html.I(className="fas fa-clipboard-check fa-4x mb-3", 
+                              style={'color': '#27ae60'}),
+                        html.H4("Statistical Output", className="mb-2"),
+                        html.P("View p-values, test statistics, and interpretations", 
+                              className="text-muted",
+                              style={'fontSize': '18px'})
+                    ], className="d-flex flex-column align-items-center justify-content-center h-100")
+                ])
+            ], className='shadow-sm', style={'height': '400px'})
+        ], width=6)
+    ])
+]
+
+# Funnel layout
+funnel_layout = [
+    dbc.Row([
+        dbc.Col([
+            dbc.Card([
+                dbc.CardHeader([
+                    html.H5("Funnel Analysis", 
+                           className="mb-0 text-center",
+                           style={'color': '#34495e', 'fontWeight': '600'})
+                ]),
+                dbc.CardBody([
+                    html.Div([
+                        html.I(className="fas fa-filter fa-4x mb-3", 
+                              style={'color': '#8e44ad'}),
+                        html.H4("Conversion Funnels", className="mb-2"),
+                        html.P("Analyze user journey and conversion rates", 
+                              className="text-muted",
+                              style={'fontSize': '18px'})
+                    ], className="d-flex flex-column align-items-center justify-content-center h-100")
+                ])
+            ], className='shadow-sm', style={'height': '400px'})
+        ], width=6),
+        
+        dbc.Col([
+            dbc.Card([
+                dbc.CardHeader([
+                    html.H5("Funnel Metrics", 
+                           className="mb-0 text-center",
+                           style={'color': '#34495e', 'fontWeight': '600'})
+                ]),
+                dbc.CardBody([
+                    html.Div([
+                        html.I(className="fas fa-chart-line fa-4x mb-3", 
+                              style={'color': '#e67e22'}),
+                        html.H4("Performance Tracking", className="mb-2"),
+                        html.P("Track drop-off rates and optimization opportunities", 
+                              className="text-muted",
+                              style={'fontSize': '18px'})
+                    ], className="d-flex flex-column align-items-center justify-content-center h-100")
+                ])
+            ], className='shadow-sm', style={'height': '400px'})
+        ], width=6)
+    ])
+]
+
+settings_subtab_layout = [
+    dbc.Row([
+        dbc.Col([
+            dbc.Card([
+                dbc.CardHeader([
+                    html.H5("System Settings", 
+                           className="mb-0 text-center",
+                           style={'color': '#34495e', 'fontWeight': '600'})
+                ]),
+                dbc.CardBody([
+                    html.Div([
+                        html.I(className="fas fa-cog fa-4x mb-3", 
+                              style={'color': '#95a5a6'}),
+                        html.H4("Configuration", className="mb-2"),
+                        html.P("System configuration and preferences", 
+                              className="text-muted",
+                              style={'fontSize': '18px'})
+                    ], className="d-flex flex-column align-items-center justify-content-center h-100")
+                ])
+            ], className='shadow-sm', style={'height': '400px'})
+        ], width=12)
     ])
 ]
 
@@ -482,13 +698,23 @@ def switch_tab(active_tab):
     Input("internal-subtabs", "active_tab")
 )
 def switch_internal_subtab(active_subtab):
-    if active_subtab == "analytics-sub":
+    if active_subtab == "population-stats":
+        return population_stats_layout
+    elif active_subtab == "frequency-tables":
+        return frequency_tables_layout
+    elif active_subtab == "pie-chart":
+        return pie_chart_layout
+    elif active_subtab == "chi-square":
+        return chi_square_layout
+    elif active_subtab == "funnel":
+        return funnel_layout
+    elif active_subtab == "analytics-sub":
         return analytics_subtab_layout
     elif active_subtab == "reports-sub":
         return reports_subtab_layout
     elif active_subtab == "settings-sub":
         return settings_subtab_layout
-    return analytics_subtab_layout
+    return population_stats_layout
 
 # File upload and data processing
 @callback(
@@ -631,7 +857,7 @@ def update_map_display(map_type, data_store):
             return dcc.Graph(
                 figure=fig, 
                 style={'height': '750px', 'width': '100%'},
-                config={'responsive': True, 'displayModeBar': False}
+                config={'responsive': True, 'displayModeBar': True, 'modeBarButtonsToRemove': ['lasso2d', 'select2d', 'toggleSpikelines']}
             )
         
         elif map_type == 'events':
@@ -643,7 +869,7 @@ def update_map_display(map_type, data_store):
             return dcc.Graph(
                 figure=fig, 
                 style={'height': '750px', 'width': '100%'},
-                config={'responsive': True, 'displayModeBar': False}
+                config={'responsive': True, 'displayModeBar': True, 'modeBarButtonsToRemove': ['lasso2d', 'select2d', 'toggleSpikelines']}
             )
         
         elif map_type == 'district_heat':
@@ -655,7 +881,7 @@ def update_map_display(map_type, data_store):
             return dcc.Graph(
                 figure=fig, 
                 style={'height': '750px', 'width': '100%'},
-                config={'responsive': True, 'displayModeBar': False}
+                config={'responsive': True, 'displayModeBar': True, 'modeBarButtonsToRemove': ['lasso2d', 'select2d', 'toggleSpikelines']}
             )
         
         else:

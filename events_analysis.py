@@ -28,7 +28,7 @@ def get_total_service_hours_located(hours_df):
     return located_hours
 
 def create_service_events_heatmap(hours_df, height=450):
-    """Create ZIP code heatmap showing where service events were hosted"""
+    """Create ZIP code heatmap showing where service events were hosted with colorful background"""
     try:
         import geopandas as gpd
         import json
@@ -86,59 +86,58 @@ def create_service_events_heatmap(hours_df, height=450):
         merged['SERVICE_EVENTS'] = merged['SERVICE_EVENTS'].fillna(0)
         merged['TOTAL_HOURS'] = merged['TOTAL_HOURS'].fillna(0)
         
-        # Convert to GeoJSON
-        merged_json = json.loads(merged.to_json())
+        # Ensure proper coordinate reference system
+        merged = merged.to_crs('EPSG:4326')
         
-        # Create hover template
-        hover_template = (
-            "<b>ZIP Code:</b> %{customdata[0]}<br>"
-            "<b>Service Events:</b> %{z}<br>"
-            "<b>Total Hours:</b> %{customdata[1]:.1f}<br>"
-            "<extra></extra>"
+        # Create color bins for better visualization
+        max_val = merged['SERVICE_EVENTS'].max()
+        if max_val > 0:
+            color_bins = [0, 1, 2, 5, 10, 15, 25, 50, 100, max_val]
+            color_bins = sorted(list(set([b for b in color_bins if b <= max_val] + [max_val])))
+        else:
+            color_bins = [0, 1]
+
+        def assign_color_category(value):
+            if value == 0:
+                return 0
+            for i, bin_val in enumerate(color_bins[1:], 1):
+                if value <= bin_val:
+                    return i
+            return len(color_bins) - 1
+
+        merged['Color_Category'] = merged['SERVICE_EVENTS'].apply(assign_color_category)
+        
+        # Create GeoJSON
+        geojson = json.loads(merged.to_json())
+        
+        # Create choropleth map with district-style appearance
+        fig = px.choropleth_mapbox(
+            merged,
+            geojson=geojson,
+            locations=merged.index,
+            color='Color_Category',
+            color_continuous_scale=['#f7fbff', '#deebf7', '#c6dbef', '#9ecae1', '#6baed6', '#4292c6', '#2171b5', '#08519c', '#08306b'],  # Blues style
+            range_color=(0, len(color_bins) - 1),
+            mapbox_style="open-street-map",  # Colorful background like district map
+            zoom=9.2,
+            center={"lat": 29.4241, "lon": -98.4936},
+            opacity=0.8,
+            hover_name='ZCTA5CE20',
+            title="Service Events by ZIP Code - Where Services Are Provided"
+        )
+
+        # Update hover template and styling
+        fig.update_traces(
+            hovertemplate="<b>ZIP Code:</b> %{hovertext}<br><b>Service Events:</b> %{customdata[0]}<br><b>Total Hours:</b> %{customdata[1]:.1f}<br><extra></extra>",
+            hovertext=merged['ZCTA5CE20'],
+            customdata=np.column_stack([merged['SERVICE_EVENTS'], merged['TOTAL_HOURS']])
         )
         
-        # Prepare custom data
-        custom_data = np.column_stack([merged['ZCTA5CE20'], merged['TOTAL_HOURS']])
-        
-        # Create choropleth map
-        fig = go.Figure(go.Choroplethmapbox(
-            geojson=merged_json,
-            locations=merged.index,
-            z=merged['SERVICE_EVENTS'],
-            colorscale='Blues',  # Blue gradient color scheme for service events
-            marker_opacity=0.85,
-            marker_line_width=0.5,
-            marker_line_color='white',
-            colorbar=dict(
-                title="Number of Service Events", 
-                len=0.7, 
-                thickness=20,
-                title_font_size=14,
-                tickfont_size=12
-            ),
-            hovertemplate=hover_template,
-            customdata=custom_data,
-            name=""
-        ))
-        
-        # Calculate center point
-        bounds = merged.total_bounds
-        center_lat = (bounds[1] + bounds[3]) / 2
-        center_lon = (bounds[0] + bounds[2]) / 2
-        
-        # Professional layout optimized for horizontal rectangle
+        # Update layout for consistent styling
         fig.update_layout(
-            mapbox_style="carto-positron",
-            mapbox_zoom=9.2,  # Slightly higher zoom for horizontal format
-            mapbox_center={"lat": center_lat, "lon": center_lon},
-            margin={"r":20,"t":60,"l":20,"b":20},
+            title={'text': "Service Events by ZIP Code - Where Services Are Provided", 'x': 0.5, 'xanchor': 'center'},
             height=height,
-            title={
-                'text': "Service Events by ZIP Code - Where Services Are Provided", 
-                'x': 0.5, 
-                'xanchor': 'center',
-                'font': {'size': 16, 'color': '#2c3e50'}
-            },
+            margin=dict(l=0, r=0, t=50, b=0),
             font=dict(family="Arial, sans-serif", size=12, color="#2c3e50"),
             paper_bgcolor='white',
             plot_bgcolor='white'
