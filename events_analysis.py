@@ -89,36 +89,16 @@ def create_service_events_heatmap(hours_df, height=450):
         # Ensure proper coordinate reference system
         merged = merged.to_crs('EPSG:4326')
         
-        # Create color bins for better visualization
-        max_val = merged['SERVICE_EVENTS'].max()
-        if max_val > 0:
-            color_bins = [0, 1, 2, 5, 10, 15, 25, 50, 100, max_val]
-            color_bins = sorted(list(set([b for b in color_bins if b <= max_val] + [max_val])))
-        else:
-            color_bins = [0, 1]
-
-        def assign_color_category(value):
-            if value == 0:
-                return 0
-            for i, bin_val in enumerate(color_bins[1:], 1):
-                if value <= bin_val:
-                    return i
-            return len(color_bins) - 1
-
-        merged['Color_Category'] = merged['SERVICE_EVENTS'].apply(assign_color_category)
-        
         # Create GeoJSON
         geojson = json.loads(merged.to_json())
         
-        # Create choropleth map with district-style appearance
+        # Create choropleth map with default colors
         fig = px.choropleth_mapbox(
             merged,
             geojson=geojson,
             locations=merged.index,
-            color='Color_Category',
-            color_continuous_scale=['#f7fbff', '#deebf7', '#c6dbef', '#9ecae1', '#6baed6', '#4292c6', '#2171b5', '#08519c', '#08306b'],  # Blues style
-            range_color=(0, len(color_bins) - 1),
-            mapbox_style="open-street-map",  # Colorful background like district map
+            color='SERVICE_EVENTS',
+            mapbox_style="open-street-map",
             zoom=9.2,
             center={"lat": 29.4241, "lon": -98.4936},
             opacity=0.8,
@@ -140,7 +120,8 @@ def create_service_events_heatmap(hours_df, height=450):
             margin=dict(l=0, r=0, t=50, b=0),
             font=dict(family="Arial, sans-serif", size=12, color="#2c3e50"),
             paper_bgcolor='white',
-            plot_bgcolor='white'
+            plot_bgcolor='white',
+            showlegend=False
         )
         
         return fig

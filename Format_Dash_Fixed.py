@@ -28,13 +28,22 @@ from dashboard_components import (
     create_quarter_volunteers_chart,
     calculate_hours_value,
     get_age_dropdown_options,
-    create_district_heat_map
+    create_district_heat_map,
+    single_var_freq,
+    multi_var_freq,
+    slice_by_active,
+    collected_freq_cols,
+    notcollected_freq_cols,
+    filter_populations
 )
 
 from data_processing import (
     process_uploaded_data,
     create_processing_summary
 )
+
+# Import dashboard_components module to set global variables
+import dashboard_components
 
 # Initialize empty datasets - data will be loaded through File Uploader tab
 clients_raw = pd.DataFrame()
@@ -43,6 +52,10 @@ survey_raw = pd.DataFrame()
 clients = pd.DataFrame()
 schoolclub_hours = pd.DataFrame(columns=['School', 'Hours', 'Club'])
 qtr_vol_counts = pd.DataFrame(columns=['QTR', 'Active Volunteers'])
+
+# Initialize global variables in dashboard_components for frequency functions
+dashboard_components.hours = hours
+dashboard_components.clients = clients
 
 # Configuration data
 bexar_zips = [78245,78254,78249,78253,78251,78228,78250,78240,78247,78207,78223,78258,78201,78227,78230,78233,78213,78221,78216,78109,78209,78244,78237,78218,78232,78260,78210,78023,78229,78217,78242,78239,78211,78238,78212,78222,78259,78261,78148,78214,78224,78015,78219,78220,78255,78248,78264,78252,78225,78204,78256,78073,78202,78112,78231,78236,78002,78226,78203,78257,78263,78208,78215,78152,78234,78205,78235,78243,78206,78262,78275,78286,78287,78054,78150,78241,78246,78265,78268,78270,78269,78278,78280,78279,78284,78283,78285,78288,78291,78289,78293,78292,78295,78294,78297,78296,78299,78298]
@@ -399,41 +412,127 @@ frequency_tables_layout = [
         dbc.Col([
             dbc.Card([
                 dbc.CardHeader([
-                    html.H5("Frequency Tables", 
+                    html.H5("Single Variable Frequency Table", 
                            className="mb-0 text-center",
                            style={'color': '#34495e', 'fontWeight': '600'})
                 ]),
                 dbc.CardBody([
+                    # 4 dropdowns for single variable frequency table
                     html.Div([
-                        html.I(className="fas fa-table fa-4x mb-3", 
-                              style={'color': '#9b59b6'}),
-                        html.H4("Frequency Analysis", className="mb-2"),
-                        html.P("Frequency distribution tables and cross-tabulations", 
-                              className="text-muted",
-                              style={'fontSize': '18px'})
-                    ], className="d-flex flex-column align-items-center justify-content-center h-100")
+                        html.Div([
+                            html.Label("Variable 1:", className="form-label mb-1", style={'fontWeight': '500', 'fontSize': '12px'}),
+                            dcc.Dropdown(
+                                id='freq-single-var1',
+                                placeholder="Select variable...",
+                                style={'marginBottom': '10px', 'fontSize': '12px'}
+                            )
+                        ]),
+                        html.Div([
+                            html.Label("Variable 2:", className="form-label mb-1", style={'fontWeight': '500', 'fontSize': '12px'}),
+                            dcc.Dropdown(
+                                id='freq-single-var2',
+                                placeholder="Select variable...",
+                                style={'marginBottom': '10px', 'fontSize': '12px'}
+                            )
+                        ]),
+                        html.Div([
+                            html.Label("Variable 3:", className="form-label mb-1", style={'fontWeight': '500', 'fontSize': '12px'}),
+                            dcc.Dropdown(
+                                id='freq-single-var3',
+                                placeholder="Select variable...",
+                                style={'marginBottom': '10px', 'fontSize': '12px'}
+                            )
+                        ]),
+                        html.Div([
+                            html.Label("Variable 4:", className="form-label mb-1", style={'fontWeight': '500', 'fontSize': '12px'}),
+                            dcc.Dropdown(
+                                id='freq-single-var4',
+                                placeholder="Select variable...",
+                                style={'marginBottom': '15px', 'fontSize': '12px'}
+                            )
+                        ])
+                    ], style={'marginBottom': '20px'}),
+                    
+                    # Content area for frequency table results
+                    html.Div([
+                        html.Div([
+                            html.I(className="fas fa-table fa-3x mb-2", 
+                                  style={'color': '#9b59b6'}),
+                            html.H6("Single Variable Analysis", className="mb-1"),
+                            html.P("Select variables above to generate frequency tables", 
+                                  className="text-muted",
+                                  style={'fontSize': '14px'})
+                        ], className="text-center")
+                    ], id='single-freq-results', style={'height': '200px', 'overflowY': 'auto'})
                 ])
-            ], className='shadow-sm', style={'height': '400px'})
+            ], className='shadow-sm', style={'height': '500px'})
         ], width=6),
         
         dbc.Col([
             dbc.Card([
                 dbc.CardHeader([
-                    html.H5("Variable Selection", 
+                    html.H5("Multivariable Frequency Tables", 
                            className="mb-0 text-center",
                            style={'color': '#34495e', 'fontWeight': '600'})
                 ]),
                 dbc.CardBody([
+                    # 5 dropdowns for multivariable frequency tables
                     html.Div([
-                        html.I(className="fas fa-cogs fa-4x mb-3", 
-                              style={'color': '#e67e22'}),
-                        html.H4("Configure Tables", className="mb-2"),
-                        html.P("Select variables for frequency analysis", 
-                              className="text-muted",
-                              style={'fontSize': '18px'})
-                    ], className="d-flex flex-column align-items-center justify-content-center h-100")
+                        html.Div([
+                            html.Label("Variable 1:", className="form-label mb-1", style={'fontWeight': '500', 'fontSize': '12px'}),
+                            dcc.Dropdown(
+                                id='freq-multi-var1',
+                                placeholder="Select variable...",
+                                style={'marginBottom': '8px', 'fontSize': '12px'}
+                            )
+                        ]),
+                        html.Div([
+                            html.Label("Variable 2:", className="form-label mb-1", style={'fontWeight': '500', 'fontSize': '12px'}),
+                            dcc.Dropdown(
+                                id='freq-multi-var2',
+                                placeholder="Select variable...",
+                                style={'marginBottom': '8px', 'fontSize': '12px'}
+                            )
+                        ]),
+                        html.Div([
+                            html.Label("Variable 3:", className="form-label mb-1", style={'fontWeight': '500', 'fontSize': '12px'}),
+                            dcc.Dropdown(
+                                id='freq-multi-var3',
+                                placeholder="Select variable...",
+                                style={'marginBottom': '8px', 'fontSize': '12px'}
+                            )
+                        ]),
+                        html.Div([
+                            html.Label("Variable 4:", className="form-label mb-1", style={'fontWeight': '500', 'fontSize': '12px'}),
+                            dcc.Dropdown(
+                                id='freq-multi-var4',
+                                placeholder="Select variable...",
+                                style={'marginBottom': '8px', 'fontSize': '12px'}
+                            )
+                        ]),
+                        html.Div([
+                            html.Label("Variable 5:", className="form-label mb-1", style={'fontWeight': '500', 'fontSize': '12px'}),
+                            dcc.Dropdown(
+                                id='freq-multi-var5',
+                                placeholder="Select variable...",
+                                style={'marginBottom': '15px', 'fontSize': '12px'}
+                            )
+                        ])
+                    ], style={'marginBottom': '15px'}),
+                    
+                    # Content area for multivariable frequency table results
+                    html.Div([
+                        html.Div([
+                            html.I(className="fas fa-cogs fa-3x mb-2", 
+                                  style={'color': '#e67e22'}),
+                            html.H6("Multivariable Analysis", className="mb-1"),
+                            html.P("Select variables above to generate cross-tabulations", 
+                                  className="text-muted",
+                                  style={'fontSize': '14px'})
+                        ], className="text-center")
+                    ], id='multi-freq-results', style={'height': '150px', 'overflowY': 'auto'})
                 ])
-            ], className='shadow-sm', style={'height': '400px'})
+            ], className='shadow-sm', style={'height': '500px'})
         ], width=6)
     ])
 ]
@@ -768,6 +867,10 @@ def handle_file_upload(contents, filename):
                 county_incomes, schools_with_clubs, yes_no_cols
             )
             
+            # Update global variables in dashboard_components for frequency functions
+            dashboard_components.hours = hours
+            dashboard_components.clients = clients
+            
             # Create success summary
             success_summary = create_processing_summary(
                 clients_raw, hours, survey_raw, clients, schoolclub_hours, qtr_vol_counts, filename
@@ -897,6 +1000,118 @@ def update_map_display(map_type, data_store):
             html.P("Please check data availability and try again", 
                    className="text-muted text-center")
         ])
+
+# Frequency Tables Callbacks
+
+# Single Variable Frequency Table Callback
+@callback(
+    Output('single-freq-results', 'children'),
+    [Input('freq-single-var1', 'value'),
+     Input('freq-single-var2', 'value'),
+     Input('freq-single-var3', 'value'),
+     Input('freq-single-var4', 'value'),
+     Input('data-store', 'children')]
+)
+def update_single_frequency_table(var1, var2, var3, var4, data_store):
+    """Generate single variable frequency tables"""
+    if clients.empty:
+        return html.Div([
+            html.P("Upload data to generate frequency tables", 
+                   className="text-muted text-center",
+                   style={'padding': '20px'})
+        ])
+    
+    # Placeholder - implement your frequency table logic here
+    results = []
+    
+    for i, var in enumerate([var1, var2, var3, var4], 1):
+        if var and var in clients.columns:
+            results.append(
+                html.Div([
+                    html.H6(f"Variable {i}: {var}", style={'fontSize': '14px', 'fontWeight': 'bold'}),
+                    html.P(f"Frequency table for {var} will be displayed here", 
+                           className="text-muted", style={'fontSize': '12px', 'marginBottom': '15px'})
+                ])
+            )
+    
+    if not results:
+        return html.Div([
+            html.P("Select variables from dropdowns above to generate frequency tables", 
+                   className="text-muted text-center",
+                   style={'padding': '20px', 'fontSize': '14px'})
+        ])
+    
+    return html.Div(results)
+
+# Multivariable Frequency Table Callback  
+@callback(
+    Output('multi-freq-results', 'children'),
+    [Input('freq-multi-var1', 'value'),
+     Input('freq-multi-var2', 'value'),
+     Input('freq-multi-var3', 'value'),
+     Input('freq-multi-var4', 'value'),
+     Input('freq-multi-var5', 'value'),
+     Input('data-store', 'children')]
+)
+def update_multi_frequency_table(var1, var2, var3, var4, var5, data_store):
+    """Generate multivariable frequency tables (cross-tabulations)"""
+    if clients.empty:
+        return html.Div([
+            html.P("Upload data to generate cross-tabulations", 
+                   className="text-muted text-center",
+                   style={'padding': '20px'})
+        ])
+    
+    # Placeholder - implement your cross-tabulation logic here
+    selected_vars = [var for var in [var1, var2, var3, var4, var5] if var and var in clients.columns]
+    
+    if len(selected_vars) < 2:
+        return html.Div([
+            html.P("Select at least 2 variables to generate cross-tabulations", 
+                   className="text-muted text-center",
+                   style={'padding': '20px', 'fontSize': '14px'})
+        ])
+    
+    return html.Div([
+        html.H6(f"Cross-tabulation: {' × '.join(selected_vars)}", 
+                style={'fontSize': '14px', 'fontWeight': 'bold'}),
+        html.P(f"Cross-tabulation table for {len(selected_vars)} variables will be displayed here", 
+               className="text-muted", style={'fontSize': '12px'})
+    ])
+
+# Update dropdown options when data changes
+@callback(
+    [Output('freq-single-var1', 'options'),
+     Output('freq-single-var2', 'options'),
+     Output('freq-single-var3', 'options'),
+     Output('freq-single-var4', 'options'),
+     Output('freq-multi-var1', 'options'),
+     Output('freq-multi-var2', 'options'),
+     Output('freq-multi-var3', 'options'),
+     Output('freq-multi-var4', 'options'),
+     Output('freq-multi-var5', 'options')],
+    Input('data-store', 'children')
+)
+def update_frequency_dropdown_options(data_store):
+    """Update dropdown options based on available data columns"""
+    if clients.empty:
+        empty_options = [{'label': 'Upload data first', 'value': None}]
+        return [empty_options] * 9
+    
+    # Get categorical columns suitable for frequency analysis
+    categorical_columns = ['District', 'School', 'Race/Ethnicity', 'Gender', 'County', 
+                          'Income Range (Thousands)', 'Age at Sign Up', 'Age Now',
+                          'Follow Through', 'Club']
+    
+    # Filter to only include columns that exist in the data
+    available_columns = [col for col in categorical_columns if col in clients.columns]
+    
+    options = [{'label': col, 'value': col} for col in available_columns]
+    
+    # Add empty option at the top
+    options.insert(0, {'label': 'Select variable...', 'value': None})
+    
+    return [options] * 9
 
 if __name__ == '__main__':
     Timer(1, lambda: webbrowser.open("http://localhost:8000")).start()

@@ -9,6 +9,10 @@ import geopandas as gpd
 import json
 import numpy as np
 
+# Initialize global variables for frequency functions
+hours = pd.DataFrame()
+clients = pd.DataFrame()
+
 def create_empty_pie_chart():
     """Create empty pie chart for when no data is available"""
     fig = px.pie(values=[1], names=['No Data Available'])
@@ -126,15 +130,13 @@ def create_district_heat_map(clients):
         if max_clients == min_clients:
             max_clients = min_clients + 1
 
-        # Create map using actual client count data for colors
+        # Create map using actual client count data with default colors
         geojson = json.loads(merged.to_json())
         fig = px.choropleth_mapbox(
             merged,
             geojson=geojson,
             locations=merged.index,
             color='Client_Count',  # Use actual client count data directly
-            color_continuous_scale=['#f7f7f7', '#deebf7', '#c6dbef', '#9ecae1', '#6baed6', '#4292c6', '#2171b5', '#08519c', '#08306b', '#05196e', '#021942'],
-            range_color=[min_clients, max_clients],  # Set range based on actual data
             mapbox_style="open-street-map",
             zoom=9,
             center={"lat": 29.4241, "lon": -98.4936},
@@ -148,64 +150,12 @@ def create_district_heat_map(clients):
             hovertext=merged['NAME']
         )
 
-        # Create clean, simple tick values for the colorbar
-        data_range = max_clients - min_clients
-        
-        # Always include min and max values, plus 3-5 intermediate values
-        if data_range <= 5:
-            # Small range: show every value
-            tick_values = list(range(min_clients, max_clients + 1))
-        elif data_range <= 20:
-            # Small-medium range: show every few values
-            step = max(1, data_range // 4)
-            tick_values = list(range(min_clients, max_clients + 1, step))
-            if max_clients not in tick_values:
-                tick_values.append(max_clients)
-        elif data_range <= 100:
-            # Medium range: show nice round numbers
-            step = 10 if data_range <= 50 else 20
-            tick_values = []
-            current = min_clients
-            while current <= max_clients:
-                tick_values.append(current)
-                current += step
-            if max_clients not in tick_values:
-                tick_values.append(max_clients)
-        else:
-            # Large range: show major intervals
-            if data_range <= 500:
-                step = 50
-            elif data_range <= 1000:
-                step = 100
-            else:
-                step = 200
-            
-            tick_values = []
-            current = min_clients
-            while current <= max_clients:
-                tick_values.append(current)
-                current += step
-            if max_clients not in tick_values:
-                tick_values.append(max_clients)
-        
-        # Ensure values are sorted and clean
-        tick_values = sorted(list(set(tick_values)))
-
-        # Update layout with colorbar showing actual data values and enable zoom controls
+        # Update layout without colorbar for simpler appearance
         fig.update_layout(
             title={'text': "San Antonio School District Client Distribution", 'x': 0.5, 'xanchor': 'center'},
             height=750,
             margin=dict(l=0, r=0, t=50, b=0),
-            coloraxis_colorbar=dict(
-                title="Number of Clients",
-                tickmode="array",
-                tickvals=tick_values,
-                ticktext=[str(val) for val in tick_values],
-                len=0.7,
-                thickness=25,
-                title_font_size=14,
-                tickfont_size=12
-            ),
+            showlegend=False,
             mapbox=dict(
                 style="open-street-map",
                 zoom=9,
@@ -372,4 +322,55 @@ def get_age_dropdown_options(clients):
         return [{'label': 'Upload data first', 'value': 16}]
     
     ages = sorted(clients['Age at Sign Up'].unique())
-    return [{'label': f'Age {age}', 'value': age} for age in ages] 
+    return [{'label': f'Age {age}', 'value': age} for age in ages]
+
+collected_freq_cols = ['Learn Participation 2022', 'Explore Participation', 'Make It Happen Badge (Yes/No)', 
+                       'Trip Eligible (Yes/No)', 'Scholarship Badge (Yes/No)', 'Step']
+
+notcollected_freq_cols = ['Age at Sign Up', 'Zip Code', 'School', 
+                          'District', 'Race/Ethnicity', 'Gender', 
+                          'Income Range (Thousands)', 'Club', 'County']
+
+filter_populations = ['Follow Through', 'District', 'Trip Eligible(Yes/No)',
+                      'Explore Participation','Make It Happen Badge (Yes/No)','Learn Participation 2022',
+                      'Scholarship Badge (Yes/No)', 'Income Range (Thousands)', 'School', 'Gender']
+
+def slice_by_active(year):
+    hours_slice = hours[hours['year']==year]
+    active_galaxy = hours_slice['Galaxy ID'].unique()
+    active_in_year = clients[clients['Galaxy ID'].isin(active_galaxy)]
+    return active_in_year
+
+def single_var_freq(var, pop='all', pop_value=None, slice='all'):
+
+    if slice == 'all':
+        if pop == 'all':
+            freq_table = pd.DataFrame(clients[var].value_counts().sort_index().reset_index())
+        elif pop in filter_populations:
+            freq_table = pd.DataFrame(clients[clients[pop]==pop_value][var].value_counts().sort_index().reset_index())
+
+    elif slice in range(2020,2100):
+        sliced_clients = slice_by_active(slice)
+        if pop == 'all':
+            freq_table = pd.DataFrame(sliced_clients[var].value_counts().sort_index().reset_index())
+        elif pop in filter_populations:
+            freq_table = pd.DataFrame(sliced_clients[clients[pop]==pop_value][var].value_counts().sort_index().reset_index())
+
+    return freq_table
+
+def multi_var_freq(var1, var2, pop='all', pop_value=None, slice='all'):
+
+    if slice == 'all':
+        if pop == 'all':
+            freq_table = pd.crosstab(clients[var1], clients[var2])
+        elif pop in filter_populations:
+            freq_table = pd.crosstab(clients[clients[pop]==pop_value][var1], clients[clients[pop]==pop_value][var2])
+
+    elif slice in range(2020,2100):
+        sliced_clients = slice_by_active(slice)
+        if pop == 'all':
+            freq_table = pd.crosstab(sliced_clients[var1], sliced_clients[var2])
+        elif pop in filter_populations:
+            freq_table = pd.crosstab(sliced_clients[clients[pop]==pop_value][var1], sliced_clients[clients[pop]==pop_value][var2])
+
+    return freq_table 
