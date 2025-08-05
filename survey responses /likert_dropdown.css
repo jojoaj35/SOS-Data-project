@@ -1,0 +1,7 @@
+#likert-question-drop .Select-control,
+#likert-question-drop .Select-menu-outer,
+#likert-question-drop .Select-placeholder,
+#likert-question-drop .Select-value,
+#likert-question-drop .Select-input input {
+    font-size: 10px !important;
+}

@@ -13,12 +13,16 @@ def process_uploaded_data(clients_raw, hours, survey_raw, county_zips, zip_incom
                           .replace({'HS Graduation Year': '0', 'Age Now': 'Unknown'}, None)
                           .replace({'Age at Sign Up': {"Unknown": 15, 0: 15, 1: 15, 4: 15}})
                           .query('`Age at Sign Up` <= 20')
-    [clients_raw['dateAdded'] >= dt.datetime(2020, 1, 1)]
     )
+    
+    # Filter by date if dateAdded column exists
+    if 'dateAdded' in clients.columns:
+        clients = clients[clients['dateAdded'] >= dt.datetime(2020, 1, 1)]
     
     # Apply data transformations
     clients[yes_no_cols] = clients[yes_no_cols].replace({'Yes': 1, 'No': 0})
-    clients['Zip Code'] = pd.to_numeric(clients['Zip Code'].astype(str).str[:5])
+    # Convert zip codes to numeric, handling errors
+    clients['Zip Code'] = pd.to_numeric(clients['Zip Code'].astype(str).str[:5], errors='coerce')
     
     # Recalculate derived columns
     hours_sum = hours.groupby('Galaxy ID')['hours'].sum()
@@ -70,14 +74,22 @@ def process_uploaded_data(clients_raw, hours, survey_raw, county_zips, zip_incom
         else:
             clients.loc[idx, 'Median Family Income'] = None
     
-    clients['Median Family Income'] = clients['Median Family Income'].astype('Int64')
+    # Convert Median Family Income to int, handling None values
+    clients['Median Family Income'] = pd.to_numeric(clients['Median Family Income'], errors='coerce').astype('Int64')
     
     # Create income range function
     def income_range(income):
-        if pd.isnull(income):
+        if pd.isnull(income) or income is None:
             return None
-        range_string = f'{int(str(income)[:-6])}0 - {int(str(income)[:-6])}9'
-        return range_string
+        try:
+            income_str = str(int(income))
+            if len(income_str) >= 6:
+                range_string = f'{int(income_str[:-6])}0 - {int(income_str[:-6])}9'
+                return range_string
+            else:
+                return None
+        except (ValueError, TypeError):
+            return None
     
     clients['Income Range (Thousands)'] = clients['Median Family Income'].apply(income_range)
     
@@ -85,6 +97,8 @@ def process_uploaded_data(clients_raw, hours, survey_raw, county_zips, zip_incom
     schoolclub_hours = clients.groupby(by='School').agg({'Hours': 'sum'}).reset_index()
     schoolclub_hours['Club'] = np.where(schoolclub_hours['School'].isin(schools_with_clubs), 1, 0).astype(str)
     
+    hours['year'] = hours['Event Date'].dt.year
+    hours['month'] = hours['Event Date'].dt.month
     # Update quarter data
     hours['qtr-year'] = (
         hours['Event Date'].dt.year.astype(str) +

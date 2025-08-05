@@ -203,7 +203,7 @@ for id in clients['Galaxy ID'].values:   #iterate through galaxy ids
         else:
             clients.loc[clients['Galaxy ID']==id, 'Median Family Income'] = None  #if zip code is outside range, assign 'None' to income
 
-clients['Median Family Income'] = clients['Median Family Income'].astype('Int64')
+clients['Median Family Income'] = clients['Median Family Income'].astype('int')
 
 def income_range(income):
     if pd.isnull(income):
