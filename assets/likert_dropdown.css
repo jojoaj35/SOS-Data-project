@@ -1,0 +1,16 @@
+#likert-question-drop .Select-control,
+#likert-question-drop .Select-menu-outer,
+#likert-question-drop .Select-placeholder,
+#likert-question-drop .Select-value,
+#likert-question-drop .Select-input input {
+    font-size: 10px !important;
+}
+
+/* Styling for the new likert-dropdown class used in Senior Survey Responses */
+.likert-dropdown .Select-control,
+.likert-dropdown .Select-menu-outer,
+.likert-dropdown .Select-placeholder,
+.likert-dropdown .Select-value,
+.likert-dropdown .Select-input input {
+    font-size: 10px !important;
+}
